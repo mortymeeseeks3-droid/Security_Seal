@@ -27,14 +27,18 @@ input,select,button{font:inherit;color:var(--fg);background:var(--bg);border:1px
 input[type=color]{padding:1px;height:30px}input[type=checkbox]{width:auto}
 button{cursor:pointer;background:var(--card)}button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
 small{color:var(--mu);grid-column:1/-1}
+#specModal{display:none;position:fixed;inset:0;z-index:9999;background:#0009;align-items:center;justify-content:center;padding:18px}
+#specModal.show{display:flex}#specModal .dialog{width:min(480px,100%);max-height:90vh;overflow:auto;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:12px;padding:18px;box-shadow:0 16px 55px #0006}
+#specModal h2{font-size:18px;margin:0 0 6px}#specModal p{margin:0 0 14px;color:var(--mu)}#specModal .fields{display:grid;grid-template-columns:1fr;gap:9px;margin:12px 0 16px}#specModal label{font-size:12px}#specModal input{padding:9px;font-size:14px}#specModal .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}#specModal .actions button{padding:9px 14px}#specModal .choice{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px}#specModal .choice button{flex:1;min-width:110px}
 @media(max-width:800px){main{flex-direction:column}#view{position:static;width:100%}#panel{width:100%}}
 </style></head><body>
 <header><h1>Security Label Designer</h1>
 <button data-a="refresh" class="p">Refresh View</button>
 <button data-a="save">Save project</button><button data-a="load">Load project</button>
-<button data-a="export">Layered SVG</button><button class="p" data-a="pdfx">Export vector PDF</button></header>
+<button data-a="export">Layered SVG</button><button class="p" data-a="pdfx">Export vector PDF</button><button data-a="specx">Spec sheet PDF (6 pages)</button></header>
 <main><div id="view"><div id="stage"></div><small id="msg"></small></div><div id="panel"></div></main>
-<input type="file" id="fpdf" accept=".pdf" hidden><input type="file" id="fsvg" accept=".svg,.pdf,.eps" hidden><input type="file" id="fjson" accept=".json" hidden><input type="file" id="ffont" accept=".ttf,.otf,.woff,.woff2" multiple webkitdirectory directory hidden><input type="file" id="fase" accept=".ase" hidden>
+<div id="specModal" role="dialog" aria-modal="true" aria-labelledby="specTitle"><div class="dialog"><h2 id="specTitle">Prepare 6-page specification PDF</h2><p>Enter the details to print on the first page, then choose whether to include a logo.</p><div class="fields"><label>Client name<input id="specClient" type="text" placeholder="Enter client name"></label><label>Job number<input id="specJob" type="text" placeholder="Enter job number"></label><label>Cutter ID<input id="specCutter" type="text" placeholder="Enter cutter ID"></label></div><strong>Add a logo?</strong><div class="choice"><button type="button" data-spec-logo="yes" class="p">Yes — choose logo</button><button type="button" data-spec-logo="no">No logo</button></div><div class="actions"><button type="button" id="specCancel">Cancel</button></div></div></div>
+<input type="file" id="fpdf" accept=".pdf" hidden><input type="file" id="fsvg" accept=".svg,.pdf,.eps" hidden><input type="file" id="fjson" accept=".json" hidden><input type="file" id="ffont" accept=".ttf,.otf,.woff,.woff2" multiple webkitdirectory directory hidden><input type="file" id="fase" accept=".ase" hidden><input type="file" id="fslogo" accept="image/*,.svg,.pdf,.eps" hidden>
 <script>
 const PT=.3528,$=s=>document.querySelector(s);
 const FONTS={},fkeys=()=>Object.keys(FONTS),fget=n=>FONTS[n]||FONTS[fkeys()[0]]||null;
@@ -190,6 +194,7 @@ document.addEventListener('click',async e=>{const a=e.target.dataset.a;if(!a)ret
  if(a=='ase')$('#fase').click();
  if(a=='preset'){preset();return}
  if(a=='pdfx')return exportPdf();
+ if(a=='specx'){openSpecDialog();return}
  if(a=='addv')S.void.lines.push({t:'VOID',size:12,rep:4,dx:0,dy:0,weight:'700',style:'normal'});
  if(a=='delv')S.void.lines.splice(+e.target.dataset.i,1);
  if(a=='addt')S.white.items.push({type:'text',t:'TEXT',x:0,y:0,size:12,rot:0,ls:0,weight:'700',style:'normal'});
@@ -239,6 +244,28 @@ function epsLogo(buf){const u=new Uint8Array(buf),dv=new DataView(buf);let o=0,n
   else if(w=='h'||w=='closepath')d+='Z';
   else if(/^[a-zA-Z]+$/.test(w))a.length=0}
  if(!d)throw 0;return {inner:`<path d="${d}" fill-rule="evenodd"/>`,vx:bb[0],vy:0,vw:bb[2]-bb[0],vh:bb[3]-bb[1]}}
+let SPEC_LOGO=null, SPEC_META={client:'',job:'',cutter:''};
+function openSpecDialog(){SPEC_LOGO=null;$('#specClient').value=SPEC_META.client;$('#specJob').value=SPEC_META.job;$('#specCutter').value=SPEC_META.cutter;$('#specModal').classList.add('show')}
+function closeSpecDialog(){ $('#specModal').classList.remove('show') }
+function saveSpecMeta(){SPEC_META={client:$('#specClient').value.trim(),job:$('#specJob').value.trim(),cutter:$('#specCutter').value.trim()}}
+$('#specCancel').onclick=closeSpecDialog;
+document.querySelectorAll('[data-spec-logo]').forEach(b=>b.addEventListener('click',()=>{saveSpecMeta();closeSpecDialog();if(b.dataset.specLogo==='yes'){$('#fslogo').value='';$('#fslogo').click()}else{SPEC_LOGO=null;exportSpec()}}));
+async function rasterSpecLogo(file){
+ const bmp=await createImageBitmap(file),scale=Math.min(1,2400/Math.max(bmp.width,bmp.height)),w=Math.max(1,Math.round(bmp.width*scale)),h=Math.max(1,Math.round(bmp.height*scale)),cv=document.createElement('canvas');
+ cv.width=w;cv.height=h;const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,w,h);cx.drawImage(bmp,0,0,w,h);bmp.close?.();
+ const blob=await new Promise((resolve,reject)=>cv.toBlob(b=>b?resolve(b):reject(new Error('Image conversion failed')),'image/jpeg',.94));
+ return {bytes:new Uint8Array(await blob.arrayBuffer()),width:w,height:h};
+}
+$('#fslogo').onchange=async e=>{const f=e.target.files[0];if(!f){e.target.value='';SPEC_LOGO=null;exportSpec();return}const ext=f.name.split('.').pop().toLowerCase();try{
+ if(ext=='pdf'||ext=='eps'||ext=='svg'){
+  const g=ext=='pdf'?await pdfLogo(await f.arrayBuffer()):ext=='eps'?epsLogo(await f.arrayBuffer()):svgLogo(await f.text());
+  SPEC_LOGO={vector:{inner:g.inner,vx:g.vx,vy:g.vy,vw:g.vw,vh:g.vh,name:f.name}};
+ }else{
+  const r=await rasterSpecLogo(f);SPEC_LOGO={raster:r,name:f.name};
+ }
+ msg('Adding "'+f.name+'" to the top of every spec sheet page…');await exportSpec();
+ }catch(x){msg('Could not use that logo file: '+(x&&x.message||'unsupported or damaged file'));}e.target.value=''};
+$('#fslogo').addEventListener('cancel',()=>{SPEC_LOGO=null;exportSpec()});
 $('#fsvg').onchange=async e=>{const f=e.target.files[0];if(!f)return;const k=LOGO||'white',ext=f.name.split('.').pop().toLowerCase();try{
  const g=ext=='pdf'?await pdfLogo(await f.arrayBuffer()):ext=='eps'?epsLogo(await f.arrayBuffer()):svgLogo(await f.text());
  (S[k].items=S[k].items||[]).push({type:'svg',inner:g.inner,vx:g.vx,vy:g.vy,vw:g.vw,vh:g.vh,x:0,y:0,w:Math.min(30,S.w*.4),rot:0,name:f.name});ui();render();
@@ -336,9 +363,8 @@ function whiteCmds(){return S.white.items.flatMap(it=>itemCmds(it,S.white.font))
 const cd=c=>c.map(q=>q.type=='Z'?'Z':q.type=='M'||q.type=='L'?`${q.type}${n3(q.x)} ${n3(q.y)}`:q.type=='Q'?`Q${n3(q.x1)} ${n3(q.y1)} ${n3(q.x)} ${n3(q.y)}`:`C${n3(q.x1)} ${n3(q.y1)} ${n3(q.x2)} ${n3(q.y2)} ${n3(q.x)} ${n3(q.y)}`).join('');
 const relOL=(di,eo)=>`<path d="${di}${cd(voidCmds())}" fill-rule="evenodd" fill="${S.rel.color}" clip-path="url(#cl)"/>`;
 const whiteOL=(ww,wh)=>`<clipPath id="cw"><rect x="5" y="5" width="${ww}" height="${wh}"/></clipPath><path d="M5 5H${5+ww}V${5+wh}H5Z${cd(whiteCmds())}" fill-rule="evenodd" fill="${S.white.color||'#ffffff'}" fill-opacity="${S.white.op}" clip-path="url(#cw)"/>`;
-function exportPdf(){
- if(!fkeys().length){msg('Load a font (TTF, OTF, WOFF, WOFF2) first — text is converted to outlines in the PDF.');return}
- render();msg('');const W=S.w,H=S.h,cx=W/2,cy=H/2,m=S.micro,V=S.void,Wh=S.white,D=S.data,ww=W-10,wh=H-10;
+function pdfLayers(){
+ const W=S.w,H=S.h,cx=W/2,cy=H/2,m=S.micro,V=S.void,Wh=S.white,D=S.data,ww=W-10,wh=H-10;
  const inner=pc(flat(shapeD(m.on?m.safe+m.band:0))),vc=voidCmds(),wc=whiteCmds(),vi=(V.items||[]).flatMap(it=>itemCmds(it,V.font)),ri=(S.rel.items||[]).flatMap(it=>itemCmds(it,V.font));
  const dc=[],di=[];D.items.forEach(it=>{const fn=it.font||D.font,f=place(it.rot,cx+it.x,cy+it.y);
   if(it.type=='num')dc.push(...tx(tcmds(fn,it.v,it.size*PT,it.ls||0,it.align||'middle'),f));
@@ -353,6 +379,10 @@ function exportPdf(){
   ['Data',D,D.spot||'Data Black',D.color,`${fl(5)}${ps(dc)}f ${ps(di)}f*`]];
  const nm=x=>x.replace(/[^A-Za-z0-9_-]/g,c=>'#'+c.charCodeAt(0).toString(16).padStart(2,'0'));
  const cs=LY.map((l,i)=>`/CS${i+1} [/Separation /${nm(l[2])} /DeviceCMYK << /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 [${(l[1].cmyk||cmyk(l[3])).join(' ')}] /N 1 >>]`).join(' ');
+ return {LY,cs,W,H}}
+async function exportPdf(){
+ if(!fkeys().length){msg('Load a font (TTF, OTF, WOFF, WOFF2) first — text is converted to outlines in the PDF.');return}
+ render();msg('');const {LY,cs,W,H}=pdfLayers(),Wh=S.white;
  const content=`${K} 0 0 -${K} 0 ${n3(H*K)} cm\n`+LY.map((l,i)=>`/OC /L${i+1} BDC q /GS${i+1} gs ${l[4]} Q EMC`).join('\n'),ids=LY.map((_,i)=>5+i+' 0 R'),ob={};
  ob[1]=`<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [${ids.join(' ')}] /D << /Order [${ids.join(' ')}] /OFF [${LY.map((l,i)=>l[1].on?'':ids[i]).join(' ')}] >> >> >>`;
  ob[2]='<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
@@ -361,7 +391,116 @@ function exportPdf(){
  LY.forEach((l,i)=>ob[5+i]=`<< /Type /OCG /Name (${l[0]}) >>`);
  let pdf='%PDF-1.7\n',off=[];for(let i=1;i<=9;i++){off[i]=pdf.length;pdf+=`${i} 0 obj\n${ob[i]}\nendobj\n`}
  const xr=pdf.length;pdf+=`xref\n0 10\n0000000000 65535 f \n`+off.slice(1).map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size 10 /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`;
- out('security-label.pdf',pdf,'application/pdf');msg('PDF: outlined text, 5 named spot colours, 5 named layers.')}
+ await out('security-label.pdf',pdf,'application/pdf');msg('PDF: outlined text, 5 named spot colours, 5 named layers.');
+}
+
+/* ---------- A4 landscape spec sheet PDF (design, dimensions, fonts, spot colours) ---------- */
+const SHAPES={rect:'Rectangle',round:'Rounded rectangle',square:'Square',circle:'Circle',oval:'Oval',custom:'PDF shape'};
+function fontName(n){const k=FONTS[n]?n:fkeys()[0],f=FONTS[k];if(!f)return'No font loaded';
+ const nm=f.ot.names||{},src=nm.fullName?nm:(nm.windows||nm.macintosh||nm.unicode||nm),g=o=>o&&(o.en||Object.values(o)[0]);
+ return g(src.fullName)||g(src.postScriptName)||k}
+function specFonts(){const m=S.micro,V=S.void,Wh=S.white,D=S.data,o=[],add=(w,fn,pt,li)=>o.push([w,fontName(fn),num(pt)+' pt',li]);
+ if(m.on){if(m.mode=='sides')(m.sides||[]).forEach((q,k)=>{if(q&&(q.t||'').trim())add('Micro '+SIDE[k]+': '+q.t.trim(),q.font||m.font,+q.size||m.size,0)});
+  else if((m.text||'').trim())add('Micro: '+m.text.trim(),m.font,m.size,0)}
+ if(V.on){V.lines.forEach((l,i)=>add('Void '+(i+1)+': '+l.t,l.font||V.font,l.size,1));(V.items||[]).forEach(it=>{if(it.type=='text')add('Void: '+it.t,it.font||V.font,it.size,1)})}
+ if(S.rel.on)(S.rel.items||[]).forEach(it=>{if(it.type=='text')add('Release: '+it.t,it.font||V.font,it.size,2)});
+ if(Wh.on)Wh.items.forEach(it=>{if(it.type=='text')add('White: '+it.t,it.font||Wh.font,it.size,3)});
+ if(D.on)D.items.forEach(it=>{if(it.type=='num')add('Data: '+it.v,it.font||D.font,it.size,4);else if(it.type=='code128'&&it.txt)add('Barcode text: '+it.v,it.font||D.font,2.2/PT,4)});
+ return o}
+function specElements(){const o=[];[['Void',S.void,1],['Release',S.rel,2],['White',S.white,3],['Data',S.data,4]].forEach(([n,l,li])=>{if(!l.on)return;(l.items||[]).forEach(it=>{
+  const ol=it.sw>0?', outline '+num(it.sw)+' mm':'';
+  if(it.type=='rect')o.push([n,`Rectangle ${num(it.w)} × ${num(it.h)} mm${it.rad?', R '+num(it.rad):''}${ol}`,li]);
+  else if(it.type=='circle')o.push([n,`Circle Ø ${num(it.w)}${it.h&&it.h!=it.w?' × '+num(it.h):''} mm${ol}`,li]);
+  else if(it.type=='svg')o.push([n,`Logo ${it.name||'graphic'}, ${num(it.w)} × ${num(it.w*it.vh/it.vw)} mm`,li]);
+  else if(it.type=='code128')o.push([n,`Code 128 "${it.v}", ${num(it.w)} × ${num(it.h)} mm`,li])})});return o}
+const LDESC=['Text running round the inner perimeter of the label.','Void message repeated over the label, clipped inside the micro text band.','Label minus 10 mm each way, with the void message and shapes knocked out.','Semi-transparent white area; text and graphics are knocked out of it.','Barcodes, numbers and graphics.'];
+/* 6-page A4 landscape spec PDF: page 1 full design, pages 2-6 one layer each */
+async function exportSpec(){
+ if(!fkeys().length){msg('Load a font (TTF, OTF, WOFF, WOFF2) first — the spec sheet draws the label with outlined text.');return}
+ try{
+ render();msg('');
+ const {LY,cs,W,H}=pdfLayers(),m=S.micro,Wh=S.white,PW=297,PH=210,f=n3,ww=W-10,wh=H-10,eo=S.shape=='custom',shp=SHAPES[S.shape]||S.shape;let c=[];
+ const hx=h=>{h=/^#[0-9a-f]{6}$/i.test(h||'')?h:'#b9bcc2';return[1,3,5].map(i=>f(parseInt(h.slice(i,i+2),16)/255)).join(' ')},
+  cx2=document.createElement('canvas').getContext&&document.createElement('canvas').getContext('2d');
+ const tw=(s,pt,b)=>{if(!cx2)return String(s).length*pt*.52/K;cx2.font=(b?'bold ':'')+'100px Helvetica,Arial,sans-serif';return cx2.measureText(s).width/100*pt/K};
+ const fit=(s,pt,mx,b)=>{s=String(s);if(!mx||tw(s,pt,b)<=mx)return s;while(s.length>1&&tw(s+'...',pt,b)>mx)s=s.slice(0,-1);return s+'...'};
+ const WA={8211:150,8212:151,8216:145,8217:146,8220:147,8221:148,8226:149,8230:133,8364:128};
+ const pstr=s=>[...String(s)].map(ch=>{const k=ch.codePointAt(0);if(k>31&&k<127)return/[()\\]/.test(ch)?'\\'+ch:ch;const w=WA[k]||(k>=160&&k<=255?k:63);return'\\'+w.toString(8).padStart(3,'0')}).join('');
+ const T=(s,x,y,pt=7,o={})=>{s=fit(s,pt,o.max,o.b);const w=tw(s,pt,o.b),g=o.g===undefined?0:o.g;
+  c.push(`BT ${g} g /${o.b?'F2':'F1'} ${f(pt/K)} Tf ${o.rot?`0 -1 -1 0 ${f(x)} ${f(y+w/2)}`:`1 0 0 -1 ${f(o.al=='r'?x-w:o.al=='c'?x-w/2:x)} ${f(y)}`} Tm (${pstr(s)}) Tj ET`)};
+ const Ln=(x1,y1,x2,y2,lw=.2,col='0 G',d='')=>c.push(`q ${col} ${lw} w ${d} ${f(x1)} ${f(y1)} m ${f(x2)} ${f(y2)} l S Q`);
+ const Rc=(x,y,w,h,fill,lw,col)=>c.push(`q ${fill?fill+' ':''}${lw?col+' '+lw+' w ':''}${f(x)} ${f(y)} ${f(w)} ${f(h)} re ${fill&&lw?'B':fill?'f':'S'} Q`);
+ const Ar=(x,y,dx,dy)=>{const l=1.8,w=.6,bx=x-dx*l,by=y-dy*l;c.push(`q 0 g ${f(x)} ${f(y)} m ${f(bx-dy*w)} ${f(by+dx*w)} l ${f(bx+dy*w)} ${f(by-dx*w)} l h f Q`)};
+ const dd=new Date(),dt=dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+ /* logo (top-left, max 55 x 11 mm), computed once */
+ let logoStr='',logoDraw='',logoW=0,logoH=0,tx0=10;const lg=SPEC_LOGO?.vector,rg=SPEC_LOGO?.raster;
+ if(lg&&lg.vw>0&&lg.vh>0){logoW=Math.min(55,11*lg.vw/lg.vh);logoH=logoW*lg.vh/lg.vw;const cm=svgc({...lg,w:logoW},(x,y)=>[10+logoW/2+x,9+logoH/2+y]);if(cm.length)logoStr=`q 0 g ${ps(cm)}f* Q`}
+ else if(rg&&rg.width>0&&rg.height>0){logoW=Math.min(55,11*rg.width/rg.height);logoH=logoW*rg.height/rg.width;logoDraw=`q ${f(logoW)} 0 0 ${f(logoH)} 10 9 cm /SpecLogo Do Q`}
+ if(logoW>0)tx0=10+logoW+6
+ const FLall=specFonts(),ELall=specElements(),NP=6,pages=[];
+ const build=pi=>{c=[];const lay=pi>=0,L=lay?LY[pi]:null;
+ if(logoStr)c.push(logoStr);if(logoDraw)c.push(logoDraw);
+ T('Security Label Specification',tx0,16,15,{b:1});
+ T(lay?`${shp} · ${num(W)} × ${num(H)} mm · Layer ${pi+1} of 5: ${L[0]}`:`${shp} · ${num(W)} × ${num(H)} mm · Full design · A4 landscape · all dimensions in mm`,tx0,20.5,7.5,{g:.4});
+ T(`Page ${pi+2} of ${NP} · Generated ${dt}`,287,16,7.5,{al:'r',g:.4});Ln(10,23,287,23,.3);
+ const PX=10,PY=27,PWd=172,PHt=120,aw=PWd-16-8,ah=PHt-9-14,s=Math.min(aw/Math.max(W,1),ah/Math.max(H,1),12),ox=PX+16+(aw-W*s)/2,oy=PY+9+(ah-H*s)/2,bx=ox+W*s,by=oy+H*s;
+ Rc(PX,PY,PWd,PHt,0,.2,'0.85 G');
+ c.push(`q ${f(s)} 0 0 ${f(s)} ${f(ox)} ${f(oy)} cm`);
+ c.push(`${hx(S.sub)} rg ${ps(pc(flat(shapeD(0))))}${eo?'f*':'f'}`);
+ LY.forEach((l,i)=>{if(lay?i==pi:l[1].on)c.push(`q /GS${i+1} gs ${l[4]} Q`)});
+ if(S.guides){const lw=f(.2/s);(m.on?[m.safe,m.safe+m.band]:[]).forEach(i=>{const d=shapeD(i);if(d)c.push(`q 0.878 0.271 0.482 RG ${lw} w [1 1] 0 d ${ps(pc(flat(d)))}S Q`)});
+  if(ww>0&&wh>0)c.push(`q 0.165 0.616 0.561 RG ${lw} w [1 1] 0 d 5 5 ${f(ww)} ${f(wh)} re S Q`)}
+ c.push(`q 0.25 G ${f(.25/s)} w ${ps(pc(flat(shapeD(0))))}S Q`);c.push('Q');
+ const yd=by+7,xd=ox-7,dim=(S.shape=='circle'?'Ø ':'')+num(W)+' mm',dimh=(S.shape=='circle'?'Ø ':'')+num(H)+' mm';
+ Ln(ox,by+1,ox,yd+1.5,.15,'0.3 G');Ln(bx,by+1,bx,yd+1.5,.15,'0.3 G');Ln(ox,yd,bx,yd,.2);Ar(ox,yd,-1,0);Ar(bx,yd,1,0);T(dim,(ox+bx)/2,yd-1.2,8,{al:'c',b:1});
+ Ln(ox-1,oy,xd-1.5,oy,.15,'0.3 G');Ln(ox-1,by,xd-1.5,by,.15,'0.3 G');Ln(xd,oy,xd,by,.2);Ar(xd,oy,0,-1);Ar(xd,by,0,1);T(dimh,xd-1.2,(oy+by)/2,8,{rot:1,b:1});
+ if(S.shape=='round'&&S.r>0){const r=Math.min(S.r,W/2,H/2)*s;Ln(ox+r*(1-.7071),oy+r*(1-.7071),ox-2,oy-2,.15,'0.3 G');T('R '+num(S.r)+' mm',ox-3,oy-2.6,7,{al:'r'})}
+ T('Shown at '+Math.round(s*100)+'%',PX+PWd-2,PY+PHt-2,6.5,{al:'r',g:.45});
+ const X0=190,CW=97;let y=27;
+ const sec=t=>{T(t,X0,y+3.2,8,{b:1});Ln(X0,y+5,X0+CW,y+5,.25);y+=8.5};
+ const kv=(k,v)=>{T(k,X0,y,7,{g:.4});T(v,X0+27,y,7,{max:CW-27});y+=4.3};
+ sec('LABEL');if(!lay){if(SPEC_META.client)kv('Client',SPEC_META.client);if(SPEC_META.job)kv('Job number',SPEC_META.job);if(SPEC_META.cutter)kv('Cutter ID',SPEC_META.cutter)}kv('Shape',shp);
+ if(S.shape=='circle')kv('Diameter','Ø '+num(W)+' mm');else kv('Size',num(W)+' × '+num(H)+' mm');
+ if(S.shape=='round')kv('Corner radius',num(S.r)+' mm');
+ if(m.on)kv('Micro text','safe zone '+num(m.safe)+' mm, band '+num(m.band)+' mm');
+ kv('White / Release',ww>0&&wh>0?num(ww)+' × '+num(wh)+' mm':'n/a (label too small)');
+ kv('Page','A4 landscape, shown at '+Math.round(s*100)+'%');y+=1;
+ Ln(X0,y-1.2,X0+8,y-1.2,.4,'0.25 G');T('Label outline',X0+11,y,6.5);y+=4.2;
+ if(S.guides){if(m.on){Ln(X0,y-1.2,X0+8,y-1.2,.4,'0.878 0.271 0.482 RG','[1 1] 0 d');T('Micro text safe zone / band edges',X0+11,y,6.5);y+=4.2}
+  Ln(X0,y-1.2,X0+8,y-1.2,.4,'0.165 0.616 0.561 RG','[1 1] 0 d');T('White / Release layer area',X0+11,y,6.5);y+=4.2}
+ y+=2;
+ if(lay){const k=L[1].cmyk||cmyk(L[3]);sec(`LAYER ${pi+1}: ${L[0].toUpperCase()}`);T(LDESC[pi],X0,y,6.5,{g:.4,max:CW});y+=5;
+  kv('Spot colour',L[2]);kv('CMYK (%)','C '+Math.round(k[0]*100)+'  M '+Math.round(k[1]*100)+'  Y '+Math.round(k[2]*100)+'  K '+Math.round(k[3]*100));
+  kv('Overprint',L[1].ovp?'Yes':'No');if(pi==3)kv('Opacity',Math.round(Wh.op*100)+'%');if(!L[1].on)kv('Status','Layer is switched off in the design');y+=2}
+ const EL=ELall.filter(e=>!lay||e[2]==pi);
+ if(EL.length){sec('ELEMENTS');EL.slice(0,6).forEach(([n,t])=>{T(n,X0,y,6.5,{g:.4});T(t,X0+16,y,6.5,{max:CW-16});y+=4});if(EL.length>6){T('+ '+(EL.length-6)+' more',X0,y,6.5,{g:.4});y+=4}y+=3}
+ const FL=FLall.filter(r=>!lay||r[3]==pi);sec('FONTS USED ('+new Set(FL.map(r=>r[1])).size+')');
+ T('Layer / text',X0,y,6.5,{b:1,g:.3});T('Font',X0+41,y,6.5,{b:1,g:.3});T('Size',X0+CW,y,6.5,{b:1,g:.3,al:'r'});y+=1.6;Ln(X0,y,X0+CW,y,.15,'0.6 G');y+=3.6;
+ const avail=PH-14-y,rh=Math.max(3.2,Math.min(4.4,avail/Math.max(FL.length,1))),mx=Math.max(1,Math.floor(avail/rh)),shown=FL.length>mx?FL.slice(0,mx-1):FL;
+ shown.forEach(r=>{T(r[0],X0,y,6.5,{max:39});T(r[1],X0+41,y,6.5,{max:43});T(r[2],X0+CW,y,6.5,{al:'r'});y+=rh});
+ if(shown.length<FL.length)T('+ '+(FL.length-shown.length)+' more',X0,y,6.5,{g:.4});
+ if(!FL.length)T(lay?'No text in this layer':'No text on the label',X0,y,6.5,{g:.4});
+ let sy=151;T(lay?'SPOT COLOUR':'SPOT COLOURS',10,sy+3.2,8,{b:1});T((lay?'this layer':'layers listed bottom to top')+' · CMYK alternate values in %',lay?38:42,sy+3.2,6.5,{g:.45});Ln(10,sy+5,182,sy+5,.25);sy+=9;
+ T('Layer',19,sy,6.5,{b:1,g:.3});T('Spot colour name',63,sy,6.5,{b:1,g:.3});[['C',119],['M',128],['Y',137],['K',146]].forEach(([t,x])=>T(t,x,sy,6.5,{b:1,g:.3,al:'r'}));T('Overprint',149,sy,6.5,{b:1,g:.3});T('Notes',162,sy,6.5,{b:1,g:.3});
+ sy+=1.6;Ln(10,sy,182,sy,.15,'0.6 G');sy+=2;
+ LY.forEach((l,i)=>{if(lay&&i!=pi)return;const k=l[1].cmyk||cmyk(l[3]),b=sy+3.9;Rc(10,sy+.8,6,4.6,`/CS${i+1} cs 1 scn`,.2,'0.4 G');
+  T((i+1)+'  '+l[0],19,b,7,{max:42});T(l[2],63,b,7,{b:1,max:45});k.forEach((v,j)=>T(String(Math.round(v*100)),[119,128,137,146][j],b,7,{al:'r'}));
+  T(l[1].ovp?'Yes':'No',149,b,7);T(!l[1].on?'Layer off':i==3?Math.round(Wh.op*100)+'% opacity':'',162,b,7,{g:.4,max:20});sy+=6.3});
+ T('Names match the Separation (spot) colours in the artwork PDF. The grey substrate in the drawing is a preview aid only.',10,sy+1.5,6,{g:.45,max:172});
+ T(`Security Label Designer · ${shp} · ${num(W)} × ${num(H)} mm`,10,205,6,{g:.5});T('Text in the artwork PDF is converted to outlines',287,205,6,{g:.5,al:'r'});
+ pages.push(`${K} 0 0 -${K} 0 ${n3(PH*K)} cm\n`+c.join('\n'))};
+ for(let pi=-1;pi<5;pi++)build(pi);
+ const ob={};ob[1]='<< /Type /Catalog /Pages 2 0 R >>';ob[2]=`<< /Type /Pages /Kids [${pages.map((_,p)=>(6+2*p)+' 0 R').join(' ')}] /Count ${pages.length} >>`;
+ ob[3]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';ob[4]='<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+ const logoObj=rg?5+2*pages.length+1:0;
+ ob[5]=`<< /ColorSpace << ${cs} >> /ExtGState << ${LY.map((l,i)=>`/GS${i+1} << /ca ${i==3?Wh.op:1} /CA ${i==3?Wh.op:1} >>`).join(' ')} >> /Font << /F1 3 0 R /F2 4 0 R >> ${rg?`/XObject << /SpecLogo ${logoObj} 0 R >>`:''} >>`;
+ pages.forEach((ct,p)=>{ob[6+2*p]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${n3(PW*K)} ${n3(PH*K)}] /Resources 5 0 R /Contents ${7+2*p} 0 R >>`;ob[7+2*p]=`<< /Length ${ct.length} >>\nstream\n${ct}\nendstream`});
+ let N=5+2*pages.length;
+ if(rg){const hex=Array.from(rg.bytes,b=>b.toString(16).padStart(2,'0')).join('')+'>';ob[++N]=`<< /Type /XObject /Subtype /Image /Width ${rg.width} /Height ${rg.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter [/ASCIIHexDecode /DCTDecode] /Length ${hex.length} >>\nstream\n${hex}\nendstream`;}
+ let pdf='%PDF-1.7\n',off=[];for(let i=1;i<=N;i++){off[i]=pdf.length;pdf+=`${i} 0 obj\n${ob[i]}\nendobj\n`}
+ const xr=pdf.length;pdf+=`xref\n0 ${N+1}\n0000000000 65535 f \n`+off.slice(1).map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${N+1} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`;
+ await out('security-label-spec.pdf',pdf,'application/pdf');msg('Spec sheet PDF exported: full design + 5 layer pages.')
+ }catch(x){msg('Spec sheet failed: '+(x&&x.message||x))}}
 
 /* ---------- .ase palette ---------- */
 function parseAse(b){const v=new DataView(b);if(v.getUint32(0)!=0x41534546)throw 0;let o=12,n=v.getUint32(8);const out=[];
