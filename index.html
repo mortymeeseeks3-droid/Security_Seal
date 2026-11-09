@@ -6,44 +6,77 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
 <style>
-:root{--bg:#f5f5f3;--fg:#1c1c1a;--card:#fff;--bd:#d9d9d4;--ac:#1f6feb;--mu:#6b6b66;--pv:#e4e4df;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececea;--card:#222226;--bd:#38383e;--ac:#5b9cff;--mu:#9a9aa2;--pv:#2c2c31;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#17171a;--fg:#ececea;--card:#222226;--bd:#38383e;--ac:#5b9cff;--mu:#9a9aa2;--pv:#2c2c31;color-scheme:dark}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-header{padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-header h1{font-size:16px;margin:0 auto 0 0}
-main{display:flex;gap:12px;padding:12px;align-items:flex-start}
-#view{flex:1 1 55%;position:sticky;top:8px;background:var(--pv);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:0}
-#stage svg{width:100%;height:auto;max-height:70vh;display:block}
-#panel{flex:1 1 45%;min-width:0}
-details{background:var(--card);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}
-summary{padding:8px 10px;font-weight:600;cursor:pointer;display:flex;gap:8px;align-items:center}
-.b{padding:0 10px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
-.b>.w,.row{grid-column:1/-1}
-.row{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;padding:6px;border:1px dashed var(--bd);border-radius:6px}
-.row>.w{grid-column:1/-1}
-label{display:flex;flex-direction:column;font-size:11px;color:var(--mu);gap:2px}
-input,select,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 6px;min-width:0}
-input[type=color]{padding:1px;height:30px}input[type=checkbox]{width:auto}
-button{cursor:pointer;background:var(--card)}button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
-small{color:var(--mu);grid-column:1/-1}
+:root{--bg:#f5f5f3;--fg:#1c1c1a;--card:#fff;--bd:#d9d9d4;--ac:#1f6feb;--mu:#6b6b66;--pv:#e4e4df;--in:#fafaf8;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececea;--card:#222226;--bd:#38383e;--ac:#5b9cff;--mu:#9a9aa2;--pv:#2c2c31;--in:#1b1b1f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececea;--card:#222226;--bd:#38383e;--ac:#5b9cff;--mu:#9a9aa2;--pv:#2c2c31;--in:#1b1b1f;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;height:100dvh;overflow:hidden;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+header{flex:none;height:44px;padding:0 10px;border-bottom:1px solid var(--bd);display:flex;gap:6px;align-items:center;background:var(--card)}
+header h1{font-size:14px;margin:0 auto 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header .sep{width:1px;height:22px;background:var(--bd);margin:0 4px}
+header button{height:30px;padding:0 10px;white-space:nowrap}
+header .ic{width:30px;padding:0;font-size:15px}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 340px;transition:grid-template-columns .2s}
+body.nopanel main{grid-template-columns:minmax(0,1fr) 0}
+body.nopanel #panel{visibility:hidden}
+#view{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--pv)}
+#vbar{flex:none;display:flex;align-items:center;gap:12px;padding:6px 10px;font-size:12px;border-bottom:1px solid var(--bd);height:34px;overflow:hidden}
+#vbar .sw{display:flex;flex-direction:row;align-items:center;gap:7px;font-size:12px;color:var(--fg);cursor:pointer;user-select:none;flex:none}
+#vbar .sw input{appearance:none;-webkit-appearance:none;width:30px;height:17px;border-radius:9px;background:var(--bd);position:relative;margin:0;padding:0;border:0;cursor:pointer;transition:background .15s}
+#vbar .sw input::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px #0004}
+#vbar .sw input:checked{background:var(--ac)}#vbar .sw input:checked::after{left:15px}
+#selinfo{color:var(--mu);font-variant-numeric:tabular-nums;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#selinfo b{color:var(--fg);font-weight:600}
+#selinfo button{height:22px;padding:0 8px;font-size:12px;margin-left:6px}
+#stage{flex:1;min-height:0;position:relative;cursor:crosshair;color:var(--fg)}
+#stage svg{position:absolute;inset:34px;width:calc(100% - 68px);height:calc(100% - 68px);display:block;overflow:visible}
+#msg{position:absolute;left:10px;bottom:8px;right:10px;color:var(--mu);font-size:12px;pointer-events:none}
+#panel{min-width:0;min-height:0;display:flex;flex-direction:column;border-left:1px solid var(--bd);background:var(--card);overflow:hidden}
+#tabs{flex:none;display:flex;gap:0;padding:4px 4px 0;border-bottom:1px solid var(--bd);overflow-x:auto;scrollbar-width:none}
+#tabs button{border:0;border-radius:0;background:none;padding:6px 2px;color:var(--mu);font-size:12px;font-weight:600;border-bottom:2px solid transparent;flex:1 1 auto;height:32px}
+#tabs button.on{color:var(--fg);border-bottom-color:var(--ac)}
+#tabs button.dim{text-decoration:line-through;opacity:.6}
+#pbody{flex:1;min-height:0;overflow-y:auto;padding:8px 10px 24px}
+.grp{padding:8px 0 10px;border-bottom:1px solid var(--bd)}.grp:last-child{border-bottom:0}
+.grp h4{margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}
+.g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 6px;align-items:end}
+.g>.w,.g>small,.g>.adds{grid-column:1/-1}.g>.w2{grid-column:span 2}
+label{display:flex;flex-direction:column;font-size:10.5px;color:var(--mu);gap:2px;min-width:0}
+label.ck{flex-direction:row;align-items:center;gap:6px;font-size:12px;color:var(--fg);height:28px;cursor:pointer}
+input,select,button{font:inherit;font-size:12.5px;color:var(--fg);background:var(--in);border:1px solid var(--bd);border-radius:6px;padding:0 6px;height:28px;min-width:0;width:100%}
+input:focus,select:focus{outline:2px solid color-mix(in srgb,var(--ac) 45%,transparent);outline-offset:-1px;border-color:var(--ac)}
+input[type=color]{padding:2px}input[type=checkbox]{width:15px;height:15px;margin:0;flex:none;accent-color:var(--ac)}
+button{cursor:pointer;background:var(--card);width:auto;padding:0 10px}button:hover{border-color:var(--mu)}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+.g>button.w{width:100%}
+small{color:var(--mu);font-size:11px}small.note{display:block;padding:8px 0 2px}small.warn{color:#d9480f}
+.mu{color:var(--mu);font-size:11px}
+.lon{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 0 4px;border-bottom:1px solid var(--bd)}
+.card{border:1px solid var(--bd);border-radius:8px;padding:6px 8px 8px;margin-bottom:6px;background:var(--bg)}
+.card .ch{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:12px;min-height:22px;cursor:pointer}
+.card .ch span{color:var(--mu);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.card .x{width:22px;height:22px;padding:0;border:0;background:none;color:var(--mu);font-size:16px;line-height:1;flex:none}.card .x:hover{color:#d9480f}
+.row.sel{border-color:#ff6a00;box-shadow:0 0 0 1px #ff6a00;background:color-mix(in srgb,#ff6a00 7%,var(--bg))}
+.adds{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}.adds button{height:26px;font-size:12px;padding:0 8px}
+.lrow{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd)}.lrow.off .lnk{opacity:.5}
+.lnk{border:0;background:none;text-align:left;padding:0;font-weight:600;height:24px}
 #specModal{display:none;position:fixed;inset:0;z-index:9999;background:#0009;align-items:center;justify-content:center;padding:18px}
 #specModal.show{display:flex}#specModal .dialog{width:min(480px,100%);max-height:90vh;overflow:auto;background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:12px;padding:18px;box-shadow:0 16px 55px #0006}
-#specModal h2{font-size:18px;margin:0 0 6px}#specModal p{margin:0 0 14px;color:var(--mu)}#specModal .fields{display:grid;grid-template-columns:1fr;gap:9px;margin:12px 0 16px}#specModal label{font-size:12px}#specModal input{padding:9px;font-size:14px}#specModal .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}#specModal .actions button{padding:9px 14px}#specModal .choice{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px}#specModal .choice button{flex:1;min-width:110px}
-#vbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 6px;font-size:12px}
-#vbar .sw{flex-direction:row;align-items:center;gap:7px;font-size:12px;color:var(--fg);cursor:pointer;user-select:none}
-#vbar .sw input{appearance:none;-webkit-appearance:none;width:32px;height:18px;border-radius:9px;background:var(--bd);position:relative;margin:0;padding:0;border:0;cursor:pointer;transition:background .15s}
-#vbar .sw input::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px #0004}
-#vbar .sw input:checked{background:var(--ac)}#vbar .sw input:checked::after{left:16px}
-#selinfo{color:var(--mu);font-variant-numeric:tabular-nums;min-width:0}#selinfo b{color:var(--fg);font-weight:600}
-#stage{cursor:crosshair;color:var(--fg)}
-.row.sel{border:1px solid #ff6a00;background:color-mix(in srgb,#ff6a00 8%,transparent)}
-@media(max-width:800px){main{flex-direction:column}#view{position:static;width:100%}#panel{width:100%}}
+#specModal h2{font-size:18px;margin:0 0 6px}#specModal p{margin:0 0 14px;color:var(--mu)}#specModal .fields{display:grid;grid-template-columns:1fr;gap:9px;margin:12px 0 16px}#specModal label{font-size:12px}#specModal input{padding:9px;font-size:14px;height:auto}#specModal .actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}#specModal .actions button{padding:9px 14px;height:auto}#specModal .choice{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 14px}#specModal .choice button{flex:1;min-width:110px;height:auto;padding:9px}
+@media(max-width:1100px){header .lt{display:none}}
+@media(max-width:800px){body{height:auto;overflow:auto}main{display:flex;flex-direction:column}#view{height:62vh;flex:none}#panel{border-left:0;border-top:1px solid var(--bd)}#pbody{overflow:visible}body.nopanel #panel{display:none}header{height:auto;flex-wrap:wrap;padding:6px 8px}header h1{flex-basis:100%}header .sep{display:none}#view{height:auto;aspect-ratio:4/3;max-height:62vh}}
+
+.card{padding:0 8px}.card .ch{margin:0;min-height:34px}.card.open{padding-bottom:8px}.card.open .ch{margin-bottom:2px}
+.card:not(.open)>.g{display:none}
+.card .ch::before{content:'';width:6px;height:6px;border-right:1.5px solid var(--mu);border-bottom:1.5px solid var(--mu);transform:rotate(-45deg);margin:0 3px 0 1px;transition:transform .15s;flex:none}
+.card.open .ch::before{transform:rotate(45deg)}
+.card .ch span{font-variant-numeric:tabular-nums}
 </style></head><body>
 <header><h1>Security Label Designer</h1>
-<button data-a="refresh" class="p">Refresh View</button>
-<button data-a="save">Save project</button><button data-a="load">Load project</button>
-<button data-a="export">Layered SVG</button><button class="p" data-a="pdfx">Export vector PDF</button><button data-a="specx">Spec sheet PDF (6 pages)</button></header>
+<button data-a="refresh" class="ic" title="Refresh view">↻</button><span class="sep"></span>
+<button data-a="save" title="Save project (.json)">Save</button><button data-a="load" title="Load project (.json)">Open</button><span class="sep"></span>
+<button data-a="export" title="Layered SVG">SVG<span class="lt"> layers</span></button><button data-a="specx" title="6-page A4 spec sheet PDF">Spec<span class="lt"> sheet</span></button><button class="p" data-a="pdfx" title="Vector PDF with spot colours and layers">Export PDF</button><span class="sep"></span>
+<button data-a="tpanel" class="ic" title="Show / hide controls">◧</button></header>
 <main><div id="view"><div id="vbar"><label class="sw"><input type="checkbox" id="dimsT">Dimensions</label><span id="selinfo"></span></div><div id="stage"></div><small id="msg"></small></div><div id="panel"></div></main>
 <div id="specModal" role="dialog" aria-modal="true" aria-labelledby="specTitle"><div class="dialog"><h2 id="specTitle">Prepare 6-page specification PDF</h2><p>Enter the details to print on the first page, then choose whether to include a logo.</p><div class="fields"><label>Client name<input id="specClient" type="text" placeholder="Enter client name"></label><label>Job number<input id="specJob" type="text" placeholder="Enter job number"></label><label>Cutter ID<input id="specCutter" type="text" placeholder="Enter cutter ID"></label></div><strong>Add a logo?</strong><div class="choice"><button type="button" data-spec-logo="yes" class="p">Yes — choose logo</button><button type="button" data-spec-logo="no">No logo</button></div><div class="actions"><button type="button" id="specCancel">Cancel</button></div></div></div>
 <input type="file" id="fpdf" accept=".pdf" hidden><input type="file" id="fsvg" accept=".svg,.pdf,.eps" hidden><input type="file" id="fjson" accept=".json" hidden><input type="file" id="ffont" accept=".ttf,.otf,.woff,.woff2" multiple webkitdirectory directory hidden><input type="file" id="fase" accept=".ase" hidden><input type="file" id="fslogo" accept="image/*,.svg,.pdf,.eps" hidden>
@@ -170,43 +203,69 @@ function refreshView(){
  });
 }
 
-/* ---------- panel ---------- */
+/* ---------- panel (tabbed: one section at a time, preview gets the rest of the window) ---------- */
+let TAB='label';const OPEN=new Set();
 const inp=(p,l,t='number',a='',c='')=>`<label class="${c}">${l}<input data-p="${p}" type="${t}" value="${esc(get(S,p)??'')}" step="any" ${a}></label>`;
-const det=(t,k,b)=>`<details open><summary><input type="checkbox" data-p="${k}.on" ${get(S,k+'.on')?'checked':''}>${t}</summary><div class="b">${b}</div></details>`;
+const chk=(p,l,c='')=>`<label class="ck ${c}"><input type="checkbox" data-p="${p}" ${get(S,p)?'checked':''}><span>${l}</span></label>`;
+const grp=(t,b,x='')=>`<section class="grp">${t?`<h4>${t}${x}</h4>`:''}<div class="g">${b}</div></section>`;
 const LK=[['micro','Micro Security Text'],['void','Void Message'],['rel','Release Layer'],['white','White Layer'],['data','Data']];
-const layersUi=()=>`<details open><summary>Layers (top to bottom)</summary><div class="b">`+[...LK].reverse().map(([k,n])=>`<div class="row" style="grid-template-columns:auto 1fr auto auto;align-items:center"><input type="checkbox" data-p="${k}.on" ${S[k].on?'checked':''}><b>${n}</b><label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" data-p="${k}.ovp" ${S[k].ovp?'checked':''}>Overprint</label><button data-a="solo" data-k="${k}"${S.solo==k?' class="p"':''}>Solo</button></div>`).join('')+`<small>Solo shows one layer on its own in the preview (exports are unaffected). Overprint multiplies the layer over those below in the preview and is flagged in the PDF.</small></div></details>`;
-
-const fsel=p=>`<label>Font<select data-p="${p}"><option value="">Arial (default)</option>${fkeys().map(k=>`<option value="${esc(k)}"${get(S,p)==k?' selected':''}>${esc(k)}</option>`).join('')}</select></label>`;
-const wsel=p=>`<label>Weight<select data-p="${p}">${[['400','Normal (400)'],['700','Bold (700)'],['100','Thin (100)'],['300','Light (300)'],['600','SemiBold (600)'],['900','Black (900)']].map(([v,n])=>`<option value="${v}"${(get(S,p)||'700')==v?' selected':''}>${n}</option>`).join('')}</select></label>`;
+const TABS=[['label','Label'],['layers','Layers'],['micro','Micro'],['void','Void'],['rel','Release'],['white','White'],['data','Data']];
+const fsel=(p,c='w2')=>`<label class="${c}">Font<select data-p="${p}"><option value="">Arial (default)</option>${fkeys().map(k=>`<option value="${esc(k)}"${get(S,p)==k?' selected':''}>${esc(k)}</option>`).join('')}</select></label>`;
+const wsel=p=>`<label>Weight<select data-p="${p}">${[['400','Normal 400'],['700','Bold 700'],['100','Thin 100'],['300','Light 300'],['600','SemiBold 600'],['900','Black 900']].map(([v,n])=>`<option value="${v}"${(get(S,p)||'700')==v?' selected':''}>${n}</option>`).join('')}</select></label>`;
 const stsel=p=>`<label>Style<select data-p="${p}">${[['normal','Normal'],['italic','Italic'],['oblique','Oblique']].map(([v,n])=>`<option value="${v}"${(get(S,p)||'normal')==v?' selected':''}>${n}</option>`).join('')}</select></label>`;
 const asel=p=>`<label>Align<select data-p="${p}">${[['start','Left'],['middle','Centre'],['end','Right']].map(([v,n])=>`<option value="${v}"${(get(S,p)||'middle')==v?' selected':''}>${n}</option>`).join('')}</select></label>`;
+const swsel=k=>S.palette?.length?`<label class="w">Palette swatch<select data-sw="${k}"><option value="">Pick swatch…</option>${S.palette.map((c,i)=>`<option value="${i}">${esc(c.name)} (${c.model})</option>`).join('')}</select></label>`:'';
+const colG=(k,x='')=>grp('Colour',inp(`${k}.color`,'Colour','color')+inp(`${k}.spot`,'Spot colour name','text','','w2')+x+swsel(k));
+const fontRow=p=>fsel(p+'font','w')+wsel(p+'weight')+stsel(p+'style');
+const card=(sel,title,sub,del,body)=>`<div class="row card${OPEN.has(sel)?' open':''}" data-sel="${sel}"><div class="ch"><b>${title}</b><span>${esc(sub||'')}</span>${del}</div><div class="g">${body}</div></div>`;
+const xbtn=(a,i,l)=>`<button class="x" data-a="${a}" data-i="${i}"${l?` data-l="${l}"`:''} title="Remove">×</button>`;
+const pos=P=>inp(P('x'),'X mm')+inp(P('y'),'Y mm')+inp(P('rot'),'Rotate °');
+const itemsList=k=>(S[k].items||[]).map((it,i)=>{const P=n=>`${k}.items.${i}.${n}`;let f,sub='';
+ const fnm=n=>n?n.replace(/\.[^.]+$/,''):'';const sz=v=>v+' pt';
+ if(it.type=='text'){sub=`${it.t} · ${sz(it.size)} · X ${it.x} Y ${it.y}`;f=inp(P('t'),'Text','text','','w')+inp(P('size'),'Size pt')+inp(P('ls'),'Letter sp.')+asel(P('align'))+fsel(P('font'),'w')+wsel(P('weight'))+stsel(P('style'))}
+ else if(it.type=='num'){sub=`${it.v} · ${sz(it.size)} · X ${it.x} Y ${it.y}`;f=inp(P('v'),'Number','text','','w')+inp(P('size'),'Size pt')+inp(P('ls'),'Letter sp.')+asel(P('align'))+fsel(P('font'),'w')+wsel(P('weight'))+stsel(P('style'))}
+ else if(it.type=='code128'){sub=`${it.v} · ${it.w}×${it.h} mm · X ${it.x} Y ${it.y}`;f=inp(P('v'),'Value (Code 128)','text','','w')+inp(P('w'),'Width mm')+inp(P('h'),'Bar height mm')+chk(P('txt'),'Value below')+fsel(P('font'),'w')+wsel(P('weight'))+stsel(P('style'))+inp(P('ls'),'Letter sp.')}
+ else if(it.type=='svg'){sub=`${it.name||'graphic'} · ${it.w} mm · X ${it.x} Y ${it.y}`;f=inp(P('w'),'Width mm')}
+ else{sub=`${it.w}×${it.type=='circle'?(it.h||it.w):it.h} mm · X ${it.x} Y ${it.y}`;f=inp(P('w'),it.type=='circle'?'Width / Ø mm':'Width mm')+inp(P('h'),'Height mm')+(it.type=='rect'?inp(P('rad'),'Corner R'):'')+inp(P('sw'),'Outline mm','number','title="0 = solid"')}
+ return card(`${k}:${i}`,TNAME[it.type]||it.type,sub,xbtn('del',i,k),f+pos(P))}).join('');
+const addBtns=(k,x='')=>`<div class="adds">${x}<button data-a="addr" data-l="${k}">+ Rectangle</button><button data-a="addc" data-l="${k}">+ Circle</button><button data-a="addl" data-l="${k}">+ Logo</button></div>`;
+const itemsG=(k,t,x)=>grp(t,`<div class="w">${itemsList(k)||'<small>None yet.</small>'}${addBtns(k,x)}</div>`);
+const onT=k=>`<div class="lon">${chk(k+'.on','Include this layer')}<span class="mu">${LK.find(l=>l[0]==k)[1]}</span></div>`;
 
-const itemsList=k=>(S[k].items||[]).map((it,i)=>{const P=n=>`${k}.items.${i}.${n}`;let f;
- if(it.type=='text')f=inp(P('t'),'Text','text','','w')+inp(P('size'),'Size pt')+fsel(P('font'))+wsel(P('weight'))+stsel(P('style'))+inp(P('ls'),'Letter spacing')+asel(P('align'));
- else if(it.type=='num')f=inp(P('v'),'Number','text','','w')+inp(P('size'),'Size pt')+fsel(P('font'))+wsel(P('weight'))+stsel(P('style'))+inp(P('ls'),'Letter spacing')+asel(P('align'));
- else if(it.type=='code128')f=inp(P('v'),'Barcode value (Code 128)','text','','w')+inp(P('w'),'Width mm')+inp(P('h'),'Bar height mm')+fsel(P('font'))+wsel(P('weight'))+stsel(P('style'))+inp(P('ls'),'Letter spacing')+`<label><span>Value below</span><input type="checkbox" data-p="${P('txt')}" ${it.txt?'checked':''}></label>`;
- else if(it.type=='svg')f=`<span class="w">Logo: ${esc(it.name||'graphic')}</span>`+inp(P('w'),'Width mm');
- else f=inp(P('w'),it.type=='circle'?'Width / diameter mm':'Width mm')+inp(P('h'),'Height mm')+(it.type=='rect'?inp(P('rad'),'Corner radius'):'')+inp(P('sw'),'Outline mm (0 = solid)');
- return `<div class="row" data-sel="${k}:${i}">${f}${inp(P('x'),'Position X mm')}${inp(P('y'),'Position Y mm')}${inp(P('rot'),'Rotate °')}<button data-a="del" data-l="${k}" data-i="${i}">Remove</button></div>`}).join('');
-const addBtns=(k,x='')=>`<div class="w"><button data-a="addr" data-l="${k}">+ Rectangle</button> <button data-a="addc" data-l="${k}">+ Circle</button> <button data-a="addl" data-l="${k}">+ Logo (SVG / PDF / EPS)</button> ${x}</div>`;
-const microUi=()=>`<label>Layout<select data-p="micro.mode"><option value="cont"${S.micro.mode!='sides'?' selected':''}>One continuous line</option><option value="sides"${S.micro.mode=='sides'?' selected':''}>Four sides</option></select></label>`+(S.micro.mode=='sides'?(S.micro.sides||defaultSides()).map((sd,k)=>`<div class="row" data-sel="ms:${k}">${inp(`micro.sides.${k}.t`,SIDE[k]+' text','text','','w')}<label>Alignment<select data-p="micro.sides.${k}.al">${[['fit','Repeat to fit'],['left','Left'],['center','Centre'],['right','Right']].map(([v,n])=>`<option value="${v}"${(sd.al||'fit')==v?' selected':''}>${n}</option>`).join('')}</select></label>${inp(`micro.sides.${k}.size`,'Size pt (0 = global)')}${fsel(`micro.sides.${k}.font`)+wsel(`micro.sides.${k}.weight`)+stsel(`micro.sides.${k}.style`)+inp(`micro.sides.${k}.ls`,'Letter spacing')+inp(`micro.sides.${k}.dy`,'Inset mm (inward)')}${inp(`micro.sides.${k}.dx`,'Shift along mm')}${inp(`micro.sides.${k}.ins`,'End margin mm')}${inp(`micro.sides.${k}.ox`,'Offset X mm')}${inp(`micro.sides.${k}.oy`,'Offset Y mm')}</div>`).join(''):inp('micro.text','Text','text','','w')+fsel('micro.font')+wsel('micro.weight')+stsel('micro.style')+inp('micro.ls','Letter spacing'));
-const swsel=k=>`<label class="w">Palette swatch<select data-sw="${k}"><option value="">${S.palette?.length?'Pick swatch…':'No palette loaded'}</option>${(S.palette||[]).map((c,i)=>`<option value="${i}">${esc(c.name)} (${c.model})</option>`).join('')}</select></label>`;
+const tabLabel=()=>grp('Shape',`<label class="w2">Shape<select data-p="shape">${[['rect','Rectangle'],['round','Rounded rectangle'],['square','Square'],['circle','Circle'],['oval','Oval'],['custom','PDF shape']].map(([v,n])=>`<option value="${v}"${S.shape==v?' selected':''}>${n}</option>`).join('')}</select></label>`+(S.shape=='round'?inp('r','Corner R'):'<span></span>')+inp('w',S.shape=='circle'?'Diameter mm':'Width mm')+(S.shape=='circle'||S.shape=='square'?'':inp('h','Height mm'))+`<button class="w" data-a="pdf">Load shape from PDF…</button><small>Uses the largest vector path on page 1, at its PDF size. Width and height can then be rescaled.</small>`)
+ +grp('Preview',inp('sub','Background','color')+chk('guides','Show guides','w2'))
+ +grp('Resources',`<button class="w" data-a="font">Add fonts (optional)…</button><button class="w" data-a="ase">Load .ase palette…</button><small>${S.palette?.length?S.palette.length+' swatches loaded. Pick them in each layer’s Colour section.':'No palette loaded.'}</small>`);
+const tabLayers=()=>grp('Top to bottom',`<div class="w">`+[...LK].reverse().map(([k,n])=>`<div class="lrow${S[k].on?'':' off'}"><input type="checkbox" data-p="${k}.on" ${S[k].on?'checked':''} title="Include layer"><button class="lnk" data-tab="${k}">${n}</button><label class="ck"><input type="checkbox" data-p="${k}.ovp" ${S[k].ovp?'checked':''}><span>Overprint</span></label><button data-a="solo" data-k="${k}"${S.solo==k?' class="p"':''}>Solo</button></div>`).join('')+`</div><small>Solo shows one layer on its own in the preview (exports are unaffected). Overprint multiplies the layer over those below in the preview and is flagged in the PDF.</small>`);
+const tabMicro=()=>{const m=S.micro,sides=m.mode=='sides';
+ return onT('micro')+grp('Layout',`<label class="w">Layout<select data-p="micro.mode"><option value="cont"${!sides?' selected':''}>One continuous line</option><option value="sides"${sides?' selected':''}>Four sides (each can be selected and moved)</option></select></label>`)
+ +(sides?grp('Sides','<div class="w">'+(m.sides||defaultSides()).map((sd,k)=>{const P=n=>`micro.sides.${k}.${n}`;
+   return card(`ms:${k}`,SIDE[k],`${(sd.t||'').trim()}${(+sd.ox||+sd.oy)?` · offset ${+sd.ox||0}, ${+sd.oy||0}`:''}`,'',inp(P('t'),'Text','text','','w')+`<label>Alignment<select data-p="${P('al')}">${[['fit','Repeat to fit'],['left','Left'],['center','Centre'],['right','Right']].map(([v,n])=>`<option value="${v}"${(sd.al||'fit')==v?' selected':''}>${n}</option>`).join('')}</select></label>`+inp(P('size'),'Size pt','number','title="0 = global size"')+inp(P('ls'),'Letter sp.')+fsel(P('font'),'w')+wsel(P('weight'))+stsel(P('style'))+inp(P('dy'),'Inset mm')+inp(P('dx'),'Shift along')+inp(P('ins'),'End margin')+inp(P('ox'),'Offset X mm')+inp(P('oy'),'Offset Y mm'))}).join('')+'</div>')
+  :grp('Text',inp('micro.text','Text','text','','w')+fontRow('micro.')+inp('micro.ls','Letter sp.')))
+ +grp('Band',inp('micro.size','Size pt')+inp('micro.safe','Safe zone mm')+inp('micro.band','Band mm')+inp('micro.reps','Repeats','number','title="0 = max fit"')+inp('micro.off','Radial offset')+'<small class="warn" id="mwarn"></small>')
+ +colG('micro')};
+const tabVoid=()=>onT('void')
+ +grp('Lines',`<div class="w">`+S.void.lines.map((l,i)=>{const P=n=>`void.lines.${i}.${n}`;
+   return card(`vl:${i}`,'Line '+(i+1),`${l.t} ×${l.rep} · ${l.size} pt${(+l.dx||+l.dy)?` · shift ${+l.dx||0}, ${+l.dy||0}`:''}`,xbtn('delv',i),inp(P('t'),'Word','text','','w2')+inp(P('rep'),'Repeats')+inp(P('size'),'Size pt')+inp(P('dx'),'Shift X mm')+inp(P('dy'),'Shift Y mm')+fsel(P('font'),'w2')+inp(P('ls'),'Letter sp.')+wsel(P('weight'))+stsel(P('style')))}).join('')+`<div class="adds"><button data-a="addv">+ Add line</button></div></div>`)
+ +grp('Block',inp('void.gap','Line spacing')+inp('void.ls','Letter sp.')+asel('void.align')+inp('void.x','X mm')+inp('void.y','Y mm')+inp('void.angle','Angle °'))
+ +grp('Default font',fontRow('void.'))+colG('void')+itemsG('void','Shapes & logos');
+const tabRel=()=>onT('rel')+`<small class="note">Label minus 10 mm each way, with the Void Message and Void items knocked out. Items added here are knocked out too.</small>`+colG('rel')+itemsG('rel','Extra knock-outs');
+const tabWhite=()=>onT('white')+`<small class="note">Rectangle = label minus 10 mm width and height. Text and graphics are cut out of it.</small>`+colG('white',inp('white.op','Opacity 0–1','number','min=0 max=1'))+grp('Default font',fontRow('white.'))+itemsG('white','Cut-outs','<button data-a="addt">+ Text</button>');
+const tabData=()=>onT('data')+colG('data')+grp('Default font',fontRow('data.'))+itemsG('data','Items','<button data-a="addb">+ Barcode</button><button data-a="addn">+ Number</button>');
+const TABF={label:tabLabel,layers:tabLayers,micro:tabMicro,void:tabVoid,rel:tabRel,white:tabWhite,data:tabData};
 
 function ui(){
- const sel=`<label>Shape<select data-p="shape">${[['rect','Rectangle'],['round','Rounded rectangle'],['square','Square'],['circle','Circle'],['oval','Oval'],['custom','PDF shape']].map(([v,n])=>`<option value="${v}"${S.shape==v?' selected':''}>${n}</option>`).join('')}</select></label>`;
- let h=layersUi()+`<details open><summary>Label</summary><div class="b">${sel}${inp('w','Width mm')}${inp('h','Height mm')}${inp('r','Corner radius')}${inp('sub','Preview background','color')}
- <button class="w" data-a="pdf">Load shape from PDF…</button><button data-a="font">Add more fonts (optional)…</button><button data-a="ase">Load .ase palette…</button><small>${S.palette?.length?S.palette.length+' swatches loaded — pick one in each layer':'No palette loaded'}</small><label><span>Guides</span><input type="checkbox" data-p="guides" ${S.guides?'checked':''}></label><small>PDF shape: first vector path on page 1 (largest). Width and height can then be rescaled.</small></div></details>`;
- h+=det('1 · Micro Security Text','micro',microUi()+inp('micro.size','Size pt')+inp('micro.safe','Safe zone mm')+inp('micro.band','Band width mm')+inp('micro.color','Colour','color')+swsel('micro')+inp('micro.reps','Repeats (0 = max fit)')+inp('micro.off','Radial offset mm')+inp('micro.spot','Spot colour name','text')+'<small id="mwarn"></small>');
- h+=det('2 · Void Message','void',S.void.lines.map((l,i)=>`<div class="row" data-sel="vl:${i}">${inp(`void.lines.${i}.t`,'Line '+(i+1)+' word','text','','w')}${inp(`void.lines.${i}.size`,'Size pt')}${inp(`void.lines.${i}.rep`,'Repeats')}${inp(`void.lines.${i}.dx`,'Shift X mm')}${inp(`void.lines.${i}.dy`,'Shift Y mm')}${fsel(`void.lines.${i}.font`)}${wsel(`void.lines.${i}.weight`)}${stsel(`void.lines.${i}.style`)}${inp(`void.lines.${i}.ls`,'Letter spacing')}<button data-a="delv" data-i="${i}">Remove Line</button></div>`).join('')+`<div class="w"><button data-a="addv">+ Add Line</button></div>`+inp('void.gap','Line spacing mm')+inp('void.ls','Default Letter spacing')+inp('void.x','Global Position X')+inp('void.y','Global Position Y')+inp('void.angle','Angle °')+inp('void.color','Colour','color')+swsel('void')+fsel('void.font')+wsel('void.weight')+stsel('void.style')+asel('void.align')+inp('void.spot','Spot colour name','text')+itemsList('void')+addBtns('void'));
- h+=det('3 · Release Layer','rel',inp('rel.color','Colour','color')+swsel('rel')+inp('rel.spot','Spot colour name','text')+'<small>Label shape with the Void Message and Void items knocked out. Items added here are knocked out too.</small>'+itemsList('rel')+addBtns('rel'));
- h+=det('4 · White Layer','white',inp('white.op','Opacity 0–1','number','min=0 max=1')+inp('white.color','Colour','color')+swsel('white')+inp('white.spot','Spot colour name','text')+fsel('white.font')+wsel('white.weight')+stsel('white.style')+`<small>Rectangle = label minus 10mm width and height. Text and graphics are cut out of it.</small>`+itemsList('white')+addBtns('white','<button data-a="addt">+ Text</button>'));
- h+=det('5 · Data','data',inp('data.color','Colour','color')+swsel('data')+inp('data.spot','Spot colour name','text')+fsel('data.font')+wsel('data.weight')+stsel('data.style')+itemsList('data')+addBtns('data','<button data-a="addb">+ Barcode</button><button data-a="addn">+ Number</button>'));
- $('#panel').innerHTML=h;markRow()}
+ const pb=$('#pbody'),keep=pb&&pb.dataset.tab==TAB?pb.scrollTop:0;
+ const tabs=TABS.map(([k,n])=>`<button data-tab="${k}" class="${TAB==k?'on':''}${S[k]&&S[k].on===false?' dim':''}">${n}</button>`).join('');
+ $('#panel').innerHTML=`<nav id="tabs">${tabs}</nav><div id="pbody" data-tab="${TAB}">${TABF[TAB]()}</div>`;
+ $('#pbody').scrollTop=keep;markRow()}
+$('#panel').addEventListener('click',e=>{const h=e.target.closest('.card>.ch');if(h&&!e.target.closest('button')){const c=h.parentNode,k=c.dataset.sel;OPEN.has(k)?OPEN.delete(k):OPEN.add(k);c.classList.toggle('open',OPEN.has(k));return}
+ const t=e.target.closest('button[data-tab]');if(!t)return;TAB=t.dataset.tab;ui();render()});
 
 $('#panel').addEventListener('input',e=>{const sw=e.target.dataset.sw;if(sw!==undefined){const c=S.palette?.[e.target.value];if(c){Object.assign(S[sw],{color:c.hex,spot:c.name,cmyk:c.cmyk});ui();render()}return}const p=e.target.dataset.p;if(!p)return;const t=e.target;
- let v=t.type=='checkbox'?t.checked:t.type=='number'?(parseFloat(t.value)||0):t.value;set(S,p,v);if(p=='micro.mode'&&!S.micro.sides)S.micro.sides=defaultSides();if(p=='micro.mode'||p.endsWith('.on'))ui();if(p.endsWith('.color'))set(S,p.slice(0,-5)+'cmyk',null);render()});
+ let v=t.type=='checkbox'?t.checked:t.type=='number'?(parseFloat(t.value)||0):t.value;set(S,p,v);if(p=='micro.mode'&&!S.micro.sides)S.micro.sides=defaultSides();if(p=='micro.mode'||p=='shape'||p.endsWith('.on'))ui();if(p.endsWith('.color'))set(S,p.slice(0,-5)+'cmyk',null);render()});
 document.addEventListener('click',async e=>{const a=e.target.dataset.a;if(!a)return;
  if(a=='refresh')return refreshView();
+ if(a=='tpanel'){document.body.classList.toggle('nopanel');return}
  if(a=='pdf')$('#fpdf').click();
  if(a=='addl'){LOGO=e.target.dataset.l;$('#fsvg').click();return}
  if(a=='addr'||a=='addc'){const k=e.target.dataset.l;(S[k].items=S[k].items||[]).push(a=='addr'?{type:'rect',x:0,y:0,w:20,h:10,rad:0,sw:0,rot:0}:{type:'circle',x:0,y:0,w:10,h:10,sw:0,rot:0})}
@@ -555,11 +614,11 @@ function parseAse(b){const v=new DataView(b);if(v.getUint32(0)!=0x41534546)throw
 $('#fase').onchange=async e=>{try{S.palette=parseAse(await e.target.files[0].arrayBuffer());if(!S.palette.length)throw 0;msg(S.palette.length+' swatches loaded. Pick them in each layer; the PDF uses their CMYK values and names as spot colours.')}catch(x){msg('Could not read that .ase file.')}e.target.value='';ui()};
 
 /* ---------- preview selection, keyboard nudge and on-screen dimensions ---------- */
-let SEL=null,nudgeRAF=0;
+let SEL=null,nudgeRAF=0,MHINT='';
 const SELC='#ff6a00';
 const LNAME={micro:'Micro',void:'Void',rel:'Release',white:'White',data:'Data'};
 const TNAME={text:'Text',num:'Number',code128:'Barcode',rect:'Rectangle',circle:'Circle',svg:'Logo'};
-const vpad=()=>S.dims?Math.max(10,.16*Math.max(S.w,S.h)):6;
+const vpad=()=>.6;
 const r4=v=>Math.round(v*1e4)/1e4;
 const sameSel=(a,b)=>!!a&&!!b&&a.k==b.k&&a.i==b.i&&!!a.line==!!b.line&&!!a.side==!!b.side;
 const selVis=k=>S[k].on&&(!S.solo||S.solo==k);
@@ -592,7 +651,7 @@ function selName(s){const it=selObj(s);if(!it)return'';
  return`${LNAME[s.k]} · ${TNAME[it.type]||it.type}${t}`}
 function markRow(scroll){document.querySelectorAll('#panel .row.sel').forEach(r=>r.classList.remove('sel'));if(!SEL)return;
  const r=document.querySelector(`#panel .row[data-sel="${SEL.side?'ms':SEL.line?'vl':SEL.k}:${SEL.i}"]`);if(!r)return;r.classList.add('sel');
- if(scroll&&innerWidth>800)r.scrollIntoView({block:'nearest',behavior:'smooth'})}
+ if(scroll&&innerWidth>800&&!document.body.classList.contains('nopanel'))r.scrollIntoView({block:'nearest',behavior:'smooth'})}
 const fx=v=>(Math.abs(v)<5e-5?0:v).toFixed(2);
 function drawOverlay(){
  const t=$('#dimsT');if(t)t.checked=!!S.dims;
@@ -607,9 +666,9 @@ function drawOverlay(){
  const dV=(y0,y1,x,txt,col,e0,e1)=>{const k=4*u;let o='';if(e0!==undefined)o+=ln(`M${e0} ${y0}H${x}M${e1??e0} ${y1}H${x}`,col,.6,`${2*u} ${2*u}`);
   return o+ln(`M${x} ${y0}V${y1}M${x-k} ${y0}H${x+k}M${x-k} ${y1}H${x+k}`,col)+lbl(x-3*u,(y0+y1)/2,txt,col,1)};
  let g='';
- if(S.dims){const off=Math.max(vpad()*.45,fs*1.6),pre=S.shape=='circle'?'Ø ':'';
+ if(S.dims){const off=16*u,pre=S.shape=='circle'?'Ø ':'';
   g+=dH(0,W,-off,pre+fx(W)+' mm','var(--fg)',-u*2)+dV(0,H,-off,pre+fx(H)+' mm','var(--fg)',-u*2)}
- let info='Click an element to select · ← ↑ → ↓ nudge 0.1 mm · Shift = 1 mm · Alt-click cycles overlaps · Esc deselects';
+ let info=MHINT||'Click an element to select · ← ↑ → ↓ nudge 0.1 mm · Shift = 1 mm · Alt-click cycles overlaps · Esc deselects';
  if(SEL){const b=cmdBox(selCmds(SEL)),it=selObj(SEL);
   if(b){const cx=b.x+b.w/2,cy=b.y+b.h/2;
    g+=`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" style="fill:${SELC};fill-opacity:.07;stroke:${SELC}" stroke-width="${1.2*u}" stroke-dasharray="${4*u} ${2*u}"/>`;
@@ -628,18 +687,18 @@ function nudge(dx,dy){const it=selObj(SEL);if(!it)return;
  else if(SEL.line){const a=-(+S.void.angle||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a);   // arrows move in screen direction even when the void block is rotated
   it.dx=r4((+it.dx||0)+dx*c-dy*s);it.dy=r4((+it.dy||0)+dx*s+dy*c);syncInp(`void.lines.${SEL.i}.dx`,it.dx);syncInp(`void.lines.${SEL.i}.dy`,it.dy)}
  else{it.x=r4((+it.x||0)+dx);it.y=r4((+it.y||0)+dy);syncInp(`${SEL.k}.items.${SEL.i}.x`,it.x);syncInp(`${SEL.k}.items.${SEL.i}.y`,it.y)}
- if(!nudgeRAF)nudgeRAF=requestAnimationFrame(()=>{nudgeRAF=0;render()})}
+ if(!nudgeRAF)nudgeRAF=requestAnimationFrame(()=>{nudgeRAF=0;ui();render()})}
 $('#stage').addEventListener('click',e=>{const root=$('#stage svg'),m=root&&root.getScreenCTM();if(!m)return;
  const ae=document.activeElement;if(ae&&ae!==document.body&&ae.blur)ae.blur();
  const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(m.inverse());
- SEL=pickAt(p.x,p.y,e.altKey,3/m.a);markRow(true);drawOverlay();
- if(!SEL&&onMicroRing(p.x,p.y))$('#selinfo').innerHTML='<b>Micro text</b> is one continuous line, so its sides can’t be moved separately. <button data-a="msplit">Split into four sides</button>'});
+ SEL=pickAt(p.x,p.y,e.altKey,3/m.a);if(SEL){TAB=SEL.k;OPEN.add(`${SEL.side?'ms':SEL.line?'vl':SEL.k}:${SEL.i}`);ui()}markRow(true);drawOverlay();
+ MHINT=!SEL&&onMicroRing(p.x,p.y)?'<b>Micro text</b> is one continuous line, so its sides can’t be moved separately. <button data-a="msplit">Split into four sides</button>':'';drawOverlay()});
 function onMicroRing(x,y){const m=S.micro;if(!selVis('micro')||m.mode=='sides')return false;const h=hostSvg(),p=document.createElementNS(svgNS,'path');
  p.setAttribute('d',shapeD(m.safe+(m.off||0))+shapeD(m.safe+m.band+(m.off||0)));p.setAttribute('fill-rule','evenodd');h.appendChild(p);
  let r=false;try{r=p.isPointInFill(new DOMPoint(x,y))}catch(e){}p.remove();return r}
 document.addEventListener('click',e=>{if(e.target.dataset.a!='msplit')return;const m=S.micro;
  m.sides=[0,1,2,3].map(()=>({t:m.text,al:'fit',font:m.font,weight:m.weight,style:m.style,ls:m.ls||0}));m.mode='sides';
- SEL={k:'micro',i:0,side:1};ui();render();msg('Micro text split into four sides (Top, Right, Bottom, Left). Click a side to select it.')});
+ SEL={k:'micro',i:0,side:1};TAB='micro';OPEN.add('ms:0');ui();render();msg('Micro text split into four sides (Top, Right, Bottom, Left). Click a side to select it.')});
 $('#panel').addEventListener('click',e=>{if(e.target.closest('input,select,button,label'))return;const r=e.target.closest('.row[data-sel]');if(!r)return;
  const[k,i]=r.dataset.sel.split(':');SEL=k=='ms'?{k:'micro',i:+i,side:1}:k=='vl'?{k:'void',i:+i,line:1}:{k,i:+i};markRow();drawOverlay()});
 document.addEventListener('keydown',e=>{if(!SEL||$('#specModal').classList.contains('show'))return;
@@ -648,7 +707,7 @@ document.addEventListener('keydown',e=>{if(!SEL||$('#specModal').classList.conta
  const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!d||e.ctrlKey||e.metaKey)return;
  e.preventDefault();const st=e.shiftKey?1:.1;nudge(d[0]*st,d[1]*st)});
 $('#dimsT').addEventListener('change',e=>{S.dims=e.target.checked;render()});
-addEventListener('resize',()=>drawOverlay());
+new ResizeObserver(()=>drawOverlay()).observe($('#stage'));
 
 ui();render();
 builtinReady.then(()=>{ui();render();}).catch(()=>msg('Could not initialise the bundled fonts.'));
