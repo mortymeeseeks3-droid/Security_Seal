@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Security Label Designer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
+<style>
+:root{--bg:#f5f5f3;--fg:#1c1c1a;--card:#fff;--bd:#d9d9d4;--ac:#1f6feb;--mu:#6b6b66;--pv:#e4e4df;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececea;--card:#222226;--bd:#38383e;--ac:#5b9cff;--mu:#9a9aa2;--pv:#2c2c31;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececea;--card:#222226;--bd:#38383e;--ac:#5b9cff;--mu:#9a9aa2;--pv:#2c2c31;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:10px 14px;border-bottom:1px solid var(--bd);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0 auto 0 0}
+main{display:flex;gap:12px;padding:12px;align-items:flex-start}
+#view{flex:1 1 55%;position:sticky;top:8px;background:var(--pv);border:1px solid var(--bd);border-radius:8px;padding:8px;min-width:0}
+#stage svg{width:100%;height:auto;max-height:70vh;display:block}
+#panel{flex:1 1 45%;min-width:0}
+details{background:var(--card);border:1px solid var(--bd);border-radius:8px;margin-bottom:8px}
+summary{padding:8px 10px;font-weight:600;cursor:pointer;display:flex;gap:8px;align-items:center}
+.b{padding:0 10px 10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
+.b>.w,.row{grid-column:1/-1}
+.row{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;padding:6px;border:1px dashed var(--bd);border-radius:6px}
+.row>.w{grid-column:1/-1}
+label{display:flex;flex-direction:column;font-size:11px;color:var(--mu);gap:2px}
+input,select,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 6px;min-width:0}
+input[type=color]{padding:1px;height:30px}input[type=checkbox]{width:auto}
+button{cursor:pointer;background:var(--card)}button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+small{color:var(--mu);grid-column:1/-1}
+@media(max-width:800px){main{flex-direction:column}#view{position:static;width:100%}#panel{width:100%}}
+</style></head><body>
+<header><h1>Security Label Designer</h1>
+<button data-a="save">Save project</button><button data-a="load">Load project</button>
+<button data-a="export">Layered SVG</button><button class="p" data-a="pdfx">Export vector PDF</button></header>
+<main><div id="view"><div id="stage"></div><small id="msg"></small></div><div id="panel"></div></main>
+<input type="file" id="fpdf" accept=".pdf" hidden><input type="file" id="fsvg" accept=".svg,.pdf,.eps" hidden><input type="file" id="fjson" accept=".json" hidden><input type="file" id="ffont" accept=".ttf,.otf,.woff" multiple hidden><input type="file" id="fase" accept=".ase" hidden>
+<script>
+const PT=.3528,$=s=>document.querySelector(s);
+const FONTS={},fkeys=()=>Object.keys(FONTS),fget=n=>FONTS[n]||FONTS[fkeys()[0]]||null;
+const fa=n=>{const f=fget(n);return f?`font-family="'${f.fam}',Arial,sans-serif" font-weight="400"`:'font-family="Arial,Helvetica,sans-serif" font-weight="700"'};
+const S={shape:'rect',w:80,h:50,r:6,custom:null,guides:true,
+micro:{on:true,text:'GENUINE ORIGINAL ',size:4,safe:1.5,band:5,color:'#111111'},
+void:{on:true,lines:[{t:'OPENED',size:12,rep:4},{t:'OPENED',size:12,rep:4},{t:'OPENED',size:12,rep:4}],gap:6,ls:0,x:0,y:0,angle:0,color:'#111111'},
+rel:{on:true,color:'#1f6feb'},
+white:{on:true,op:.6,items:[{type:'text',t:'SECURE',x:0,y:-5,size:20,rot:0}]},
+data:{on:true,color:'#000000',items:[{type:'code128',v:'123456789',x:0,y:8,w:40,h:9,rot:0,txt:true}]}};
+let M={};
+S.white.color='#ffffff';S.white.spot='White';S.micro.spot='Micro Text';Object.assign(S.micro,{ls:0,reps:0,off:0,mode:'cont'});S.sub='#b9bcc2';S.void.items=[];S.rel.items=[];S.micro.sides=defaultSides();S.void.spot='Void';S.rel.spot='Release';S.data.spot='Data Black';S.micro.font=S.void.font=S.white.font=S.data.font='';
+const get=(o,p)=>p.split('.').reduce((a,k)=>a?.[k],o);
+const set=(o,p,v)=>{const k=p.split('.'),l=k.pop();get(o,k.join('.')||'')?.constructor;let t=o;k.forEach(x=>t=t[x]);t[l]=v};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=v=>Math.round(v*100)/100;
+
+/* ---------- shapes (mm) ---------- */
+function rr(x,y,w,h,r){r=Math.max(0,Math.min(r,w/2,h/2));return `M${x+r} ${y}H${x+w-r}A${r} ${r} 0 0 1 ${x+w} ${y+r}V${y+h-r}A${r} ${r} 0 0 1 ${x+w-r} ${y+h}H${x+r}A${r} ${r} 0 0 1 ${x} ${y+h-r}V${y+r}A${r} ${r} 0 0 1 ${x+r} ${y}Z`}
+function shapeD(i){const W=S.w,H=S.h,w=W-2*i,h=H-2*i;if(w<=0||h<=0)return'';const k=S.shape;
+ if(k=='rect'||k=='square')return rr(i,i,w,h,0);
+ if(k=='round')return rr(i,i,w,h,S.r-i);
+ if(k=='circle'||k=='oval')return `M${i} ${H/2}A${w/2} ${h/2} 0 1 0 ${W-i} ${H/2}A${w/2} ${h/2} 0 1 0 ${i} ${H/2}Z`;
+ const c=S.custom;if(!c)return rr(i,i,w,h,0);const sx=w/c.bw,sy=h/c.bh;
+ return c.segs.map(s=>s[0]+s.slice(1).map((v,j)=>num(j%2?i+v*sy:i+v*sx)).join(' ')).join('')}
+
+/* ---------- code 128 (set B) ---------- */
+const P='212222,222122,222221,121223,121322,131222,122213,122312,132212,221213,221312,231212,112232,122132,122231,113222,123122,123221,223211,221132,221231,213212,223112,312131,311222,321122,321221,312212,322112,322211,212123,212321,232121,111323,131123,131321,112313,132113,132311,211313,231113,231311,112133,112331,132131,113123,113321,133121,313121,211331,231131,213113,213311,213131,311123,311321,331121,312113,312311,332111,314111,221411,431111,111224,111422,121124,121421,141122,141221,112214,112412,122114,122411,142112,142211,241211,221114,413111,241112,134111,111242,121142,121241,114212,124112,124211,411212,421112,421211,212141,214121,412121,111143,111341,131141,114113,114311,411113,411311,113141,114131,311141,411131,211412,211214,211232,2331112'.split(',');
+function c128b(v,w){const c=[104];let sum=104,n=0;for(const ch of v){const k=ch.charCodeAt(0)-32;if(k<0||k>94)continue;n++;c.push(k);sum+=k*n}c.push(sum%103,106);
+ let x=10,bars=[];c.forEach(k=>[...P[k]].forEach((d,j)=>{d=+d;if(j%2==0)bars.push([x,d]);x+=d}));
+ const u=w/(x+10);return bars.map(([a,b])=>[a*u,b*u])}
+const c128=(v,w,h)=>c128b(v,w).map(([a,b])=>`M${num(a)} 0h${num(b)}v${h}h${num(-b)}z`).join('');
+
+/* ---------- layer markup ---------- */
+function voidT(){const V=S.void,cx=S.w/2,cy=S.h/2;
+ return `<g transform="rotate(${V.angle} ${cx} ${cy})">`+V.lines.map((l,i)=>`<text x="${cx+V.x+(l.dx||0)}" y="${cy+V.y+(i-1)*V.gap}" font-size="${num(l.size*PT)}" text-anchor="${V.align||'middle'}" dominant-baseline="central" letter-spacing="${V.ls}">${esc(Array(Math.max(1,l.rep|0)).fill(l.t).join(' '))}</text>`).join('')+'</g>'}
+function itm(it){const t=`translate(${S.w/2+it.x} ${S.h/2+it.y}) rotate(${it.rot})`;
+ if(it.type=='text')return `<text transform="${t}" font-size="${num(it.size*PT)}" text-anchor="${it.align||'middle'}" dominant-baseline="central">${esc(it.t)}</text>`;
+ if(it.type=='rect'||it.type=='circle')return `<path transform="${t}" d="${sd(it)}" fill-rule="evenodd"/>`;
+ return `<g transform="${t} scale(${it.w/it.vw}) translate(${-(it.vx+it.vw/2)} ${-(it.vy+it.vh/2)})">${it.inner}</g>`}
+function sd(it){const w=+it.w||10,h=+(it.type=='circle'?(it.h||w):(it.h||6)),sw=+it.sw||0,r=+it.rad||0,
+ sh=(w,h,r)=>it.type=='circle'?`M${-w/2} 0A${w/2} ${h/2} 0 1 0 ${w/2} 0A${w/2} ${h/2} 0 1 0 ${-w/2} 0Z`:rr(-w/2,-h/2,w,h,r);
+ return sh(w,h,r)+(sw>0&&w>2*sw&&h>2*sw?sh(w-2*sw,h-2*sw,Math.max(0,r-sw)):'')}
+function dat(it){if(['rect','circle','svg'].includes(it.type))return itm(it);const t=`translate(${S.w/2+it.x} ${S.h/2+it.y}) rotate(${it.rot})`;
+ if(it.type=='num')return `<text transform="${t}" font-size="${num(it.size*PT)}" text-anchor="${it.align||'middle'}" dominant-baseline="central" ${fa(S.data.font)}>${esc(it.v)}</text>`;
+ return `<g transform="${t}"><path transform="translate(${-it.w/2} ${-it.h/2})" d="${c128(it.v,it.w,it.h)}"/>`+(it.txt?`<text y="${it.h/2+2}" font-size="2.2" text-anchor="middle" dominant-baseline="central" ${fa(S.data.font)}>${esc(it.v)}</text>`:'')+'</g>'}
+
+const SIDE=['Top','Right','Bottom','Left'];
+function defaultSides(){return ['GENUINE LABELLOCK SECURITY SEAL · ','MADE IN BRITAIN · ','GENUINE LABELLOCK SECURITY SEAL · ','MADE IN BRITAIN · '].map(t=>({t,al:'fit'}))}
+const KM={Micro_Security_Text:'micro',Void_Message:'void',Release_Layer:'rel',White_Layer:'white',Data:'data'};
+function sideLines(){const m=S.micro,W=S.w,H=S.h,s=m.safe,b=m.band,c=s+b/2+(m.off||0),rc=S.shape=='round'?Math.max(0,S.r-s):0,sd=m.sides||defaultSides();
+ const B=[[s+rc,c,W-s-rc,c,0,1],[W-c,s+b,W-c,H-s-b,-1,0],[s+rc,H-c,W-s-rc,H-c,0,-1],[c,H-s-b,c,s+b,1,0]];
+ return B.map(([x0,y0,x1,y1,ix,iy],k)=>{const q=sd[k]||{},L=Math.hypot(x1-x0,y1-y0)||1,ux=(x1-x0)/L,uy=(y1-y0)/L,dy=+q.dy||0,ins=+q.ins||0,dx=(q.al||'fit')=='fit'?0:(+q.dx||0);
+  return [x0+ix*dy+ux*(ins+dx),y0+iy*dy+uy*(ins+dx),x1+ix*dy-ux*(ins-dx),y1+iy*dy-uy*(ins-dx)]})}
+function microSvg(mm){const m=S.micro,at=`${fa(m.font)} fill="${m.color}" dominant-baseline="central"`;
+ if(m.mode!='sides')return `<path id="mp" d="${shapeD(m.safe+m.band/2+(m.off||0))}" fill="none"/><text id="mtx" ${at} font-size="${num(m.size*PT)}" letter-spacing="${mm?mm.ls:(m.ls||0)}"><textPath id="mt" href="#mp">${esc(mm?mm.txt:m.text)}</textPath></text>`;
+ return sideLines().map((l,k)=>{const q=(m.sides||[])[k]||{},it=mm&&mm.items?mm.items[k]:null,an=it?it.an:((q.al=='right')?'end':q.al=='center'?'middle':'start');
+  return `<path id="mp${k}" d="M${num(l[0])} ${num(l[1])}L${num(l[2])} ${num(l[3])}" fill="none"/><text id="mtx${k}" ${at} font-size="${num((+q.size||m.size)*PT)}" letter-spacing="${it?it.ls:(m.ls||0)}" text-anchor="${an}"><textPath id="mt${k}" href="#mp${k}" startOffset="${an=='middle'?'50%':an=='end'?'100%':'0'}">${esc(it?it.txt:q.t||'')}</textPath></text>`}).join('')}
+function build(ex){const W=S.w,H=S.h,d0=shapeD(0),m=S.micro,V=S.void,eo=S.shape=='custom'?' fill-rule="evenodd" clip-rule="evenodd"':'';
+ const L=(id,n,on,x)=>{const k=KM[id],vis=on&&(ex||!S.solo||S.solo==k);return `<g id="${id}" inkscape:label="${n}" inkscape:groupmode="layer"${vis?'':' display="none"'}${S[k].ovp?' style="mix-blend-mode:multiply"':''}>${x}</g>`};
+ const di=shapeD(m.on?m.safe+m.band:0),ww=W-10,wh=H-10,mm=ex&&M.key==mkey()?M:null;
+ let o=`<svg id="sv" xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" `+(ex?`width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}"`:`viewBox="-6 -6 ${W+12} ${H+12}"`)+`><defs><clipPath id="cl"><path d="${di}"${eo}/></clipPath></defs>`;
+ if(!ex)o+=`<path d="${d0}"${eo} fill="${S.sub||'#b9bcc2'}"/>`;
+ o+=L('Micro_Security_Text','Micro Security Text',m.on,microSvg(mm));
+ o+=L('Void_Message','Void Message',V.on,`<g clip-path="url(#cl)" fill="${V.color}" ${fa(V.font)}>${voidT()}${(V.items||[]).map(itm).join('')}</g>`);
+ o+=L('Release_Layer','Release Layer',S.rel.on,(`<mask id="mr" maskUnits="userSpaceOnUse" x="-5" y="-5" width="${W+10}" height="${H+10}"><rect x="-5" y="-5" width="${W+10}" height="${H+10}" fill="#fff"/><g fill="#000" ${fa(V.font)}>${voidT()}${[...(V.items||[]),...(S.rel.items||[])].map(itm).join('')}</g></mask><path d="${di}"${eo} fill="${S.rel.color}" mask="url(#mr)"/>`));
+ o+=L('White_Layer','White Layer',S.white.on,(ww>0&&wh>0?`<mask id="mw" maskUnits="userSpaceOnUse" x="5" y="5" width="${ww}" height="${wh}"><rect x="5" y="5" width="${ww}" height="${wh}" fill="#fff"/><g fill="#000" ${fa(S.white.font)}>${S.white.items.map(itm).join('')}</g></mask><rect x="5" y="5" width="${ww}" height="${wh}" fill="#fff" fill-opacity="${S.white.op}" mask="url(#mw)"/>`:''));
+ o+=L('Data','Data',S.data.on,`<g fill="${S.data.color}">${S.data.items.map(dat).join('')}</g>`);
+ if(!ex&&S.guides)o+=`<g fill="none" stroke-width=".2" pointer-events="none"><path d="${d0}" stroke="#888"/><path d="${shapeD(m.safe)}" stroke="#e0457b" stroke-dasharray="1 1"/><path d="${shapeD(m.safe+m.band)}" stroke="#e0457b" stroke-dasharray="1 1"/>${ww>0&&wh>0?`<rect x="5" y="5" width="${ww}" height="${wh}" stroke="#2a9d8f" stroke-dasharray="1 1"/>`:''}</g>`;
+ return o+'</svg>'}
+const mkey=()=>[S.micro.text,S.micro.size,S.micro.safe,S.micro.band,S.micro.ls,S.micro.reps,S.micro.off,S.micro.mode,JSON.stringify(S.micro.sides),S.shape,S.w,S.h,S.r,S.custom&&S.custom.bw].join('|');
+
+function render(){
+ if(S.shape=='square'||S.shape=='circle'){S.h=S.w;const e=$('[data-p=h]');if(e)e.value=S.h}
+ $('#stage').innerHTML=build(false);
+ const m=S.micro;let w='';
+ if(m.mode=='sides'){M={key:mkey(),items:[]};const ws=[];
+  sideLines().forEach((l,k)=>{const sd=m.sides[k],t=$('#mt'+k),x=$('#mtx'+k),per=Math.hypot(l[2]-l[0],l[3]-l[1]);
+   if(!t||!sd.t.trim()){M.items.push(null);return}
+   const al=sd.al||'fit',an=al=='right'?'end':al=='center'?'middle':'start';
+   x.setAttribute('letter-spacing',m.ls||0);t.textContent=sd.t;const len=x.getComputedTextLength(),ch=[...sd.t].length;let txt=sd.t,ls=m.ls||0;
+   if(al=='fit'&&len>0){const mx=Math.floor(per/len),n=Math.max(1,m.reps>0?Math.min(m.reps,mx||1):mx);txt=sd.t.repeat(n);ls+=(per-n*len)/(n*ch);if(mx<1)ws.push(SIDE[k]+' text is longer than its edge')}
+   else if(len>per+.01)ws.push(SIDE[k]+' text is longer than its edge');
+   x.setAttribute('letter-spacing',ls);x.setAttribute('text-anchor',an);t.setAttribute('startOffset',an=='middle'?'50%':an=='end'?'100%':'0');t.textContent=txt;
+   M.items.push({txt,ls,an,per,fit:al=='fit',size:+sd.size||m.size})});
+  w=ws.join('. ')+(m.size*PT>m.band?' Text is taller than the band.':'')}
+ else{const t=$('#mt'),x=$('#mtx'),p=$('#mp');
+  if(t&&m.text.trim()&&p.getAttribute('d')){x.setAttribute('letter-spacing',m.ls||0);t.textContent=m.text;
+   const len=x.getComputedTextLength(),per=p.getTotalLength(),ch=[...m.text].length;
+   if(len>0&&per>0){const mx=Math.floor(per/len),n=Math.max(1,m.reps>0?Math.min(m.reps,mx||1):mx),ls=(m.ls||0)+(per-n*len)/(n*ch);
+    x.setAttribute('letter-spacing',ls);t.textContent=m.text.repeat(n);M={key:mkey(),txt:m.text.repeat(n),ls,per,n};
+    w=`${n} full repeat${n>1?'s':''}, spacing justified to ${num(ls)}mm.`+(mx<1?' Text is longer than the perimeter: shorten it or reduce size.':'')+(m.size*PT>m.band?' Text is taller than the band.':'')}}}
+ const e=$('#mwarn');if(e)e.textContent=w;if(S.w<=10||S.h<=10)msg('The White Layer is the label minus 10mm in width and height, so it needs a label bigger than 10mm each way.')}
+
+/* ---------- panel ---------- */
+const inp=(p,l,t='number',a='',c='')=>`<label class="${c}">${l}<input data-p="${p}" type="${t}" value="${esc(get(S,p)??'')}" step="any" ${a}></label>`;
+const det=(t,k,b)=>`<details open><summary><input type="checkbox" data-p="${k}.on" ${get(S,k+'.on')?'checked':''}>${t}</summary><div class="b">${b}</div></details>`;
+const LK=[['micro','Micro Security Text'],['void','Void Message'],['rel','Release Layer'],['white','White Layer'],['data','Data']];
+const layersUi=()=>`<details open><summary>Layers (top to bottom)</summary><div class="b">`+[...LK].reverse().map(([k,n])=>`<div class="row" style="grid-template-columns:auto 1fr auto auto;align-items:center"><input type="checkbox" data-p="${k}.on" ${S[k].on?'checked':''}><b>${n}</b><label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" data-p="${k}.ovp" ${S[k].ovp?'checked':''}>Overprint</label><button data-a="solo" data-k="${k}"${S.solo==k?' class="p"':''}>Solo</button></div>`).join('')+`<small>Solo shows one layer on its own in the preview (exports are unaffected). Overprint multiplies the layer over those below in the preview and is flagged in the PDF.</small></div></details>`;
+const itemsList=k=>(S[k].items||[]).map((it,i)=>{const P=n=>`${k}.items.${i}.${n}`;let f;
+ if(it.type=='text')f=inp(P('t'),'Text','text','','w')+inp(P('size'),'Size pt')+asel(P('align'));
+ else if(it.type=='num')f=inp(P('v'),'Number','text','','w')+inp(P('size'),'Size pt')+asel(P('align'));
+ else if(it.type=='code128')f=inp(P('v'),'Barcode value (Code 128)','text','','w')+inp(P('w'),'Width mm')+inp(P('h'),'Bar height mm')+`<label><span>Value below</span><input type="checkbox" data-p="${P('txt')}" ${it.txt?'checked':''}></label>`;
+ else if(it.type=='svg')f=`<span class="w">Logo: ${esc(it.name||'graphic')}</span>`+inp(P('w'),'Width mm');
+ else f=inp(P('w'),it.type=='circle'?'Width / diameter mm':'Width mm')+inp(P('h'),'Height mm')+(it.type=='rect'?inp(P('rad'),'Corner radius'):'')+inp(P('sw'),'Outline mm (0 = solid)');
+ return `<div class="row">${f}${inp(P('x'),'X')}${inp(P('y'),'Y')}${inp(P('rot'),'Rotate °')}<button data-a="del" data-l="${k}" data-i="${i}">Remove</button></div>`}).join('');
+const addBtns=(k,x='')=>`<div class="w"><button data-a="addr" data-l="${k}">+ Rectangle</button> <button data-a="addc" data-l="${k}">+ Circle</button> <button data-a="addl" data-l="${k}">+ Logo (SVG / PDF / EPS)</button> ${x}</div>`;
+const microUi=()=>`<label>Layout<select data-p="micro.mode"><option value="cont"${S.micro.mode!='sides'?' selected':''}>One continuous line</option><option value="sides"${S.micro.mode=='sides'?' selected':''}>Four sides</option></select></label>`+(S.micro.mode=='sides'?(S.micro.sides||defaultSides()).map((sd,k)=>`<div class="row">${inp(`micro.sides.${k}.t`,SIDE[k]+' text','text','','w')}<label>Alignment<select data-p="micro.sides.${k}.al">${[['fit','Repeat to fit'],['left','Left'],['center','Centre'],['right','Right']].map(([v,n])=>`<option value="${v}"${(sd.al||'fit')==v?' selected':''}>${n}</option>`).join('')}</select></label>${inp(`micro.sides.${k}.size`,'Size pt (0 = global)')}${inp(`micro.sides.${k}.dy`,'Inset mm (inward)')}${inp(`micro.sides.${k}.dx`,'Shift along mm')}${inp(`micro.sides.${k}.ins`,'End margin mm')}</div>`).join(''):inp('micro.text','Text','text','','w'));
+const swsel=k=>`<label class="w">Palette swatch<select data-sw="${k}"><option value="">${S.palette?.length?'Pick swatch…':'No palette loaded'}</option>${(S.palette||[]).map((c,i)=>`<option value="${i}">${esc(c.name)} (${c.model})</option>`).join('')}</select></label>`;
+const fsel=p=>`<label>Font<select data-p="${p}"><option value="">${fkeys().length?'First loaded font':'Arial (preview only)'}</option>${fkeys().map(k=>`<option value="${esc(k)}"${get(S,p)==k?' selected':''}>${esc(k)}</option>`).join('')}</select></label>`;
+const asel=p=>`<label>Align<select data-p="${p}">${[['start','Left'],['middle','Centre'],['end','Right']].map(([v,n])=>`<option value="${v}"${(get(S,p)||'middle')==v?' selected':''}>${n}</option>`).join('')}</select></label>`;
+function ui(){
+ const sel=`<label>Shape<select data-p="shape">${[['rect','Rectangle'],['round','Rounded rectangle'],['square','Square'],['circle','Circle'],['oval','Oval'],['custom','PDF shape']].map(([v,n])=>`<option value="${v}"${S.shape==v?' selected':''}>${n}</option>`).join('')}</select></label>`;
+ let h=layersUi()+`<details open><summary>Label</summary><div class="b">${sel}${inp('w','Width mm')}${inp('h','Height mm')}${inp('r','Corner radius')}${inp('sub','Preview background','color')}
+ <button class="w" data-a="pdf">Load shape from PDF…</button><button data-a="font">Load font(s)…</button><button data-a="ase">Load .ase palette…</button><small>${S.palette?.length?S.palette.length+' swatches loaded — pick one in each layer':'No palette loaded'}</small><button data-a="preset">LabelLock-style example</button><label><span>Guides</span><input type="checkbox" data-p="guides" ${S.guides?'checked':''}></label><small>PDF shape: first vector path on page 1 (largest). Width and height can then be rescaled.</small></div></details>`;
+ h+=det('1 · Micro Security Text','micro',microUi()+inp('micro.size','Size pt')+inp('micro.safe','Safe zone mm')+inp('micro.band','Band width mm')+inp('micro.color','Colour','color')+swsel('micro')+inp('micro.ls','Letter spacing mm')+inp('micro.reps','Repeats (0 = max fit)')+inp('micro.off','Radial offset mm')+fsel('micro.font')+inp('micro.spot','Spot colour name','text')+'<small id="mwarn"></small>');
+ h+=det('2 · Void Message','void',S.void.lines.map((l,i)=>`<div class="row">${inp(`void.lines.${i}.t`,'Line '+(i+1)+' word','text','','w')}${inp(`void.lines.${i}.size`,'Size pt')}${inp(`void.lines.${i}.rep`,'Repeats')}${inp(`void.lines.${i}.dx`,'Shift X mm')}</div>`).join('')+inp('void.gap','Line spacing mm')+inp('void.ls','Letter spacing')+inp('void.x','Position X')+inp('void.y','Position Y')+inp('void.angle','Angle °')+inp('void.color','Colour','color')+swsel('void')+fsel('void.font')+asel('void.align')+inp('void.spot','Spot colour name','text')+itemsList('void')+addBtns('void'));
+ h+=det('3 · Release Layer','rel',inp('rel.color','Colour','color')+swsel('rel')+inp('rel.spot','Spot colour name','text')+'<small>Label shape with the Void Message and Void items knocked out. Items added here are knocked out too.</small>'+itemsList('rel')+addBtns('rel'));
+ h+=det('4 · White Layer','white',inp('white.op','Opacity 0–1','number','min=0 max=1')+inp('white.color','Colour','color')+swsel('white')+inp('white.spot','Spot colour name','text')+fsel('white.font')+`<small>Rectangle = label minus 10mm width and height. Text and graphics are cut out of it.</small>`+itemsList('white')+addBtns('white','<button data-a="addt">+ Text</button>'));
+ h+=det('5 · Data','data',inp('data.color','Colour','color')+swsel('data')+inp('data.spot','Spot colour name','text')+fsel('data.font')+itemsList('data')+addBtns('data','<button data-a="addb">+ Barcode</button><button data-a="addn">+ Number</button>'));
+ $('#panel').innerHTML=h}
+
+$('#panel').addEventListener('input',e=>{const sw=e.target.dataset.sw;if(sw!==undefined){const c=S.palette?.[e.target.value];if(c){Object.assign(S[sw],{color:c.hex,spot:c.name,cmyk:c.cmyk});ui();render()}return}const p=e.target.dataset.p;if(!p)return;const t=e.target;
+ let v=t.type=='checkbox'?t.checked:t.type=='number'?(parseFloat(t.value)||0):t.value;set(S,p,v);if(p=='micro.mode'&&!S.micro.sides)S.micro.sides=defaultSides();if(p=='micro.mode'||p.endsWith('.on'))ui();if(p.endsWith('.color'))set(S,p.slice(0,-5)+'cmyk',null);render()});
+document.addEventListener('click',async e=>{const a=e.target.dataset.a;if(!a)return;
+ if(a=='pdf')$('#fpdf').click();
+ if(a=='addl'){LOGO=e.target.dataset.l;$('#fsvg').click();return}
+ if(a=='addr'||a=='addc'){const k=e.target.dataset.l;(S[k].items=S[k].items||[]).push(a=='addr'?{type:'rect',x:0,y:0,w:20,h:10,rad:0,sw:0,rot:0}:{type:'circle',x:0,y:0,w:10,h:10,sw:0,rot:0})}
+ if(a=='load')$('#fjson').click();
+ if(a=='font')$('#ffont').click();
+ if(a=='solo'){const k=e.target.dataset.k;S.solo=S.solo==k?'':k;ui();render();return}
+ if(a=='ase')$('#fase').click();
+ if(a=='preset'){preset();return}
+ if(a=='pdfx')return exportPdf();
+ if(a=='addt')S.white.items.push({type:'text',t:'TEXT',x:0,y:0,size:12,rot:0});
+ if(a=='addb')S.data.items.push({type:'code128',v:'0123456789',x:0,y:0,w:40,h:9,rot:0,txt:true});
+ if(a=='addn')S.data.items.push({type:'num',v:'000001',x:0,y:0,size:10,rot:0});
+ if(a=='del')S[e.target.dataset.l].items.splice(+e.target.dataset.i,1);
+ if(a=='save')return out('security-label.json',JSON.stringify(S),'application/json');
+ if(a=='export'){render();return out('security-label-layers.svg','<?xml version="1.0" encoding="UTF-8"?>\n'+build(true),'image/svg+xml')}
+ if(['addt','addb','addn','addr','addc','del'].includes(a)){ui();render()}});
+async function out(name,txt,mime){try{const d=await claude.use('downloads');if(d){await d.save({filename:name,data:txt});return}}catch(e){if(e&&e.code=='declined')return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:mime}));a.download=name;a.click()}
+const msg=t=>$('#msg').textContent=t||'';
+
+$('#fjson').onchange=async e=>{try{Object.assign(S,JSON.parse(await e.target.files[0].text()));M={};ui();render()}catch(x){msg('Could not read project file.')}e.target.value=''};
+let LOGO='white';
+function svgLogo(t){const r=new DOMParser().parseFromString(t,'image/svg+xml').documentElement;let vb=(r.getAttribute('viewBox')||'').split(/[\s,]+/).map(Number);
+ if(vb.length<4||vb.some(isNaN))vb=[0,0,parseFloat(r.getAttribute('width'))||100,parseFloat(r.getAttribute('height'))||100];
+ r.querySelectorAll('script,style,image,foreignObject').forEach(n=>n.remove());
+ const inner=[...r.childNodes].map(n=>new XMLSerializer().serializeToString(n)).join('').replace(/(fill)\s*=\s*"(?!none)[^"]*"/gi,'$1="inherit"').replace(/stroke\s*=\s*"(?!none)[^"]*"/gi,'stroke="none"').replace(/fill\s*:\s*(?!none)[^;"]+/gi,'fill:inherit').replace(/stroke\s*:\s*(?!none)[^;"]+/gi,'stroke:none');
+ return {inner:`<g>${inner}</g>`,vx:vb[0],vy:vb[1],vw:vb[2],vh:vb[3]}}
+async function pdfLogo(buf){const O=pdfjsLib.OPS;pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+ const pg=await(await pdfjsLib.getDocument({data:buf}).promise).getPage(1),ol=await pg.getOperatorList();let m=[1,0,0,1,0,0],st=[],d='',xs=[],ys=[];
+ const tp=(x,y)=>{const X=m[0]*x+m[2]*y+m[4],Y=-(m[1]*x+m[3]*y+m[5]);xs.push(X);ys.push(Y);return +X.toFixed(2)+' '+ +Y.toFixed(2)};
+ ol.fnArray.forEach((fn,k)=>{const a=ol.argsArray[k];
+  if(fn==O.save)st.push(m);else if(fn==O.restore)m=st.pop()||m;
+  else if(fn==O.transform)m=[m[0]*a[0]+m[2]*a[1],m[1]*a[0]+m[3]*a[1],m[0]*a[2]+m[2]*a[3],m[1]*a[2]+m[3]*a[3],m[0]*a[4]+m[2]*a[5]+m[4],m[1]*a[4]+m[3]*a[5]+m[5]];
+  else if(fn==O.constructPath){const c=a[1];let j=0,cx=0,cy=0;
+   for(const op of a[0]){
+    if(op==O.moveTo){cx=c[j++];cy=c[j++];d+='M'+tp(cx,cy)}
+    else if(op==O.lineTo){cx=c[j++];cy=c[j++];d+='L'+tp(cx,cy)}
+    else if(op==O.curveTo){const q=c.slice(j,j+6);j+=6;cx=q[4];cy=q[5];d+='C'+tp(q[0],q[1])+' '+tp(q[2],q[3])+' '+tp(q[4],q[5])}
+    else if(op==O.curveTo2){const q=c.slice(j,j+4);j+=4;d+='C'+tp(cx,cy)+' '+tp(q[0],q[1])+' '+tp(q[2],q[3]);cx=q[2];cy=q[3]}
+    else if(op==O.curveTo3){const q=c.slice(j,j+4);j+=4;d+='C'+tp(q[0],q[1])+' '+tp(q[2],q[3])+' '+tp(q[2],q[3]);cx=q[2];cy=q[3]}
+    else if(op==O.closePath)d+='Z';
+    else if(op==O.rectangle){const [x,y,w,h]=c.slice(j,j+4);j+=4;d+='M'+tp(x,y)+'L'+tp(x+w,y)+'L'+tp(x+w,y+h)+'L'+tp(x,y+h)+'Z';cx=x;cy=y}}}});
+ if(!d)throw 0;const x0=Math.min(...xs),y0=Math.min(...ys);return {inner:`<path d="${d}" fill-rule="evenodd"/>`,vx:x0,vy:y0,vw:Math.max(...xs)-x0,vh:Math.max(...ys)-y0}}
+function epsLogo(buf){const u=new Uint8Array(buf),dv=new DataView(buf);let o=0,n=u.length;if(u.length>12&&dv.getUint32(0,true)==0xC6D3D0C5){o=dv.getUint32(4,true);n=o+dv.getUint32(8,true)}
+ let t=new TextDecoder('latin1').decode(u.slice(o,n));const bb=(t.match(/%%BoundingBox:\s*(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)/)||[]).slice(1).map(Number);if(bb.length<4)throw 0;
+ const i=Math.max(t.lastIndexOf('%%EndSetup'),t.lastIndexOf('%%EndProlog'));if(i>0)t=t.slice(i);
+ const a=[],Y=y=>bb[3]-y,P=(x,y)=>+x.toFixed(2)+' '+ +Y(y).toFixed(2);let d='',cx=0,cy=0;
+ for(const w of t.replace(/%.*$/gm,' ').split(/\s+/)){if(w!==''&&!isNaN(+w)){a.push(+w);continue}
+  if(w=='m'||w=='moveto'){cy=a.pop();cx=a.pop();d+='M'+P(cx,cy)}
+  else if(w=='l'||w=='lineto'){cy=a.pop();cx=a.pop();d+='L'+P(cx,cy)}
+  else if(w=='c'||w=='curveto'){const q=a.splice(-6);d+='C'+P(q[0],q[1])+' '+P(q[2],q[3])+' '+P(q[4],q[5]);cx=q[4];cy=q[5]}
+  else if(w=='v'){const q=a.splice(-4);d+='C'+P(cx,cy)+' '+P(q[0],q[1])+' '+P(q[2],q[3]);cx=q[2];cy=q[3]}
+  else if(w=='y'){const q=a.splice(-4);d+='C'+P(q[0],q[1])+' '+P(q[2],q[3])+' '+P(q[2],q[3]);cx=q[2];cy=q[3]}
+  else if(w=='h'||w=='closepath')d+='Z';
+  else if(/^[a-zA-Z]+$/.test(w))a.length=0}
+ if(!d)throw 0;return {inner:`<path d="${d}" fill-rule="evenodd"/>`,vx:bb[0],vy:0,vw:bb[2]-bb[0],vh:bb[3]-bb[1]}}
+$('#fsvg').onchange=async e=>{const f=e.target.files[0];if(!f)return;const k=LOGO||'white',ext=f.name.split('.').pop().toLowerCase();try{
+ const g=ext=='pdf'?await pdfLogo(await f.arrayBuffer()):ext=='eps'?epsLogo(await f.arrayBuffer()):svgLogo(await f.text());
+ (S[k].items=S[k].items||[]).push({type:'svg',inner:g.inner,vx:g.vx,vy:g.vy,vw:g.vw,vh:g.vh,x:0,y:0,w:Math.min(30,S.w*.4),rot:0,name:f.name});ui();render();
+ msg('Logo added to the '+k+' layer. Only filled shapes are used, so convert strokes to outlines first.')}catch(x){msg('Could not read that '+ext.toUpperCase()+' logo (EPS needs plain-text path data).')}e.target.value=''};
+
+/* ---------- PDF shape import ---------- */
+$('#fpdf').onchange=async e=>{const f=e.target.files[0];if(!f)return;msg('Reading PDF…');try{
+ const O=pdfjsLib.OPS;pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+ const pg=await(await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise).getPage(1),ol=await pg.getOperatorList();
+ let m=[1,0,0,1,0,0],st=[],best=null;const tp=(x,y)=>[m[0]*x+m[2]*y+m[4],-(m[1]*x+m[3]*y+m[5])];
+ ol.fnArray.forEach((fn,k)=>{const a=ol.argsArray[k];
+  if(fn==O.save)st.push(m);else if(fn==O.restore)m=st.pop()||m;
+  else if(fn==O.transform)m=[m[0]*a[0]+m[2]*a[1],m[1]*a[0]+m[3]*a[1],m[0]*a[2]+m[2]*a[3],m[1]*a[2]+m[3]*a[3],m[0]*a[4]+m[2]*a[5]+m[4],m[1]*a[4]+m[3]*a[5]+m[5]];
+  else if(fn==O.constructPath){const c=a[1];let j=0,cx=0,cy=0,sg=[];
+   for(const op of a[0]){
+    if(op==O.moveTo){cx=c[j++];cy=c[j++];sg.push(['M',...tp(cx,cy)])}
+    else if(op==O.lineTo){cx=c[j++];cy=c[j++];sg.push(['L',...tp(cx,cy)])}
+    else if(op==O.curveTo){const q=c.slice(j,j+6);j+=6;cx=q[4];cy=q[5];sg.push(['C',...tp(q[0],q[1]),...tp(q[2],q[3]),...tp(q[4],q[5])])}
+    else if(op==O.curveTo2){const q=c.slice(j,j+4);j+=4;sg.push(['C',...tp(cx,cy),...tp(q[0],q[1]),...tp(q[2],q[3])]);cx=q[2];cy=q[3]}
+    else if(op==O.curveTo3){const q=c.slice(j,j+4);j+=4;sg.push(['C',...tp(q[0],q[1]),...tp(q[2],q[3]),...tp(q[2],q[3])]);cx=q[2];cy=q[3]}
+    else if(op==O.closePath)sg.push(['Z']);
+    else if(op==O.rectangle){const [x,y,w,h]=c.slice(j,j+4);j+=4;sg.push(['M',...tp(x,y)],['L',...tp(x+w,y)],['L',...tp(x+w,y+h)],['L',...tp(x,y+h)],['Z']);cx=x;cy=y}}
+   const v=sg.flatMap(s=>s.slice(1));if(!v.length)return;
+   const xs=v.filter((_,i)=>i%2==0),ys=v.filter((_,i)=>i%2),ar=(Math.max(...xs)-Math.min(...xs))*(Math.max(...ys)-Math.min(...ys));
+   if(!best||ar>best.ar)best={sg,ar,x0:Math.min(...xs),y0:Math.min(...ys),x1:Math.max(...xs),y1:Math.max(...ys)}}});
+ if(!best)throw 0;
+ S.custom={segs:best.sg.map(s=>[s[0],...s.slice(1).map((v,j)=>num((v-(j%2?best.y0:best.x0))*PT))]),bw:(best.x1-best.x0)*PT,bh:(best.y1-best.y0)*PT};
+ S.shape='custom';S.w=num(S.custom.bw);S.h=num(S.custom.bh);M={};msg('PDF shape loaded at its PDF size.');ui();render()
+}catch(x){msg('No vector path found on page 1 of that PDF.')}e.target.value=''};
+
+$('#ffont').onchange=async e=>{for(const f of e.target.files){try{const b=await f.arrayBuffer(),ot=opentype.parse(b),fam='LF'+fkeys().length,ff=new FontFace(fam,b.slice(0));await ff.load();document.fonts.add(ff);FONTS[f.name]={ot,fam}}catch(x){msg('Could not read font '+f.name)}}e.target.value='';ui();render()};
+function preset(){Object.assign(S,{shape:'round',w:90,h:30,r:3,custom:null});
+ Object.assign(S.micro,{on:true,text:'GENUINE LABELLOCK SECURITY SEAL · MADE IN BRITAIN · ',size:4,color:'#0b4f9c'});
+ Object.assign(S.void,{on:true,lines:[{t:'OPENED',size:18,rep:4,dx:0},{t:'OPENED',size:18,rep:4,dx:-14},{t:'OPENED',size:18,rep:4,dx:-5}],gap:6,x:0,y:0,ls:0,angle:0,color:'#dff0fb',align:'middle'});
+ Object.assign(S.rel,{on:true,color:'#1d8fe0'});
+ Object.assign(S.white,{on:true,op:.6,items:[{type:'text',t:'SECURITY SEAL',x:0,y:5,size:22,rot:0},{type:'text',t:'LABEL LOCK',x:-34,y:-5,size:14,rot:0,align:'start'}]});
+ Object.assign(S.data,{on:true,color:'#111111',items:[{type:'num',v:'4DC069516',x:24,y:-5,size:12,rot:0}]});M={};ui();render()}
+
+/* ---------- vector PDF (outlined text, Separation spot colours, OCG layers) ---------- */
+const svgNS='http://www.w3.org/2000/svg',K=72/25.4,n3=v=>+v.toFixed(3);
+function hostSvg(){let h=$('#host');if(!h){h=document.createElementNS(svgNS,'svg');h.id='host';h.setAttribute('style','position:absolute;left:-9999px;width:10px;height:10px');document.body.appendChild(h)}return h}
+function flat(d,st=.15){const h=hostSvg(),o=[];d.split(/(?=[Mm])/).filter(x=>x.trim()).forEach(x=>{const p=document.createElementNS(svgNS,'path');p.setAttribute('d',x);h.appendChild(p);const L=p.getTotalLength(),n=Math.max(2,Math.min(4000,Math.ceil(L/st))),pts=[];for(let i=0;i<=n;i++){const q=p.getPointAtLength(L*i/n);pts.push([q.x,q.y])}p.remove();o.push({pts,closed:/z\s*$/i.test(x.trim())})});return o}
+const pc=a=>a.flatMap(q=>q.pts.map((p,i)=>({type:i?'L':'M',x:p[0],y:p[1]})).concat(q.closed?[{type:'Z'}]:[]));
+function ps(c){let s='',x0=0,y0=0;for(const q of c){if(q.type=='Z'){s+='h ';continue}
+ if(q.type=='Q')s+=`${n3(x0+2/3*(q.x1-x0))} ${n3(y0+2/3*(q.y1-y0))} ${n3(q.x+2/3*(q.x1-q.x))} ${n3(q.y+2/3*(q.y1-q.y))} ${n3(q.x)} ${n3(q.y)} c `;
+ else s+=(q.type=='C'?`${n3(q.x1)} ${n3(q.y1)} ${n3(q.x2)} ${n3(q.y2)} `:'')+`${n3(q.x)} ${n3(q.y)} ${q.type=='M'?'m':q.type=='L'?'l':'c'} `;x0=q.x;y0=q.y}return s}
+const tx=(c,f)=>c.map(q=>{if(q.type=='Z')return q;const o={type:q.type};[o.x,o.y]=f(q.x,q.y);if(q.x1!==undefined)[o.x1,o.y1]=f(q.x1,q.y1);if(q.x2!==undefined)[o.x2,o.y2]=f(q.x2,q.y2);return o});
+const rotAbout=(a,cx,cy)=>{const c=Math.cos(a*Math.PI/180),s=Math.sin(a*Math.PI/180);return(x,y)=>[cx+(x-cx)*c-(y-cy)*s,cy+(x-cx)*s+(y-cy)*c]};
+const place=(rot,X,Y)=>{const r=rotAbout(rot,0,0);return(x,y)=>{const[a,b]=r(x,y);return[a+X,b+Y]}};
+function tcmds(fn,str,size,ls,an){const f=fget(fn).ot,k=size/f.unitsPerEm,g=f.stringToGlyphs(str),
+ a=g.map((q,i)=>q.advanceWidth*k+ls+(i<g.length-1?(f.getKerningValue(q,g[i+1])||0)*k:0)),W=a.reduce((p,q)=>p+q,0),by=(f.ascender+f.descender)/2*k;
+ let x=an=='middle'?-W/2:an=='end'?-W:0,o=[];g.forEach((q,i)=>{o.push(...q.getPath(x,by,size).commands);x+=a[i]});return o}
+function mcmds(){const m=S.micro;if(!m.on||M.key!=mkey())return[];
+ const its=m.mode=='sides'?(M.items||[]).map((it,k)=>it&&{...it,id:'mp'+k}):[{id:'mp',txt:M.txt,ls:M.ls,per:M.per,an:'start',fit:true}];
+ const f=fget(m.font).ot,o=[];
+ its.forEach(it=>{if(!it||!it.txt)return;const size=(it.size||m.size)*PT,k=size/f.unitsPerEm,by=(f.ascender+f.descender)/2*k,g=f.stringToGlyphs(it.txt),a=g.map(q=>q.advanceWidth*k),sa=a.reduce((p,q)=>p+q,0),ex=it.fit?(it.per-sa)/g.length:it.ls,tot=sa+ex*g.length,p=$('#'+it.id);
+  let d=it.fit||it.an=='start'?0:it.an=='middle'?(it.per-tot)/2:it.per-tot;
+  g.forEach((q,i)=>{const w=a[i]+ex,t=d+w/2;d+=w;const P=p.getPointAtLength(t),P1=p.getPointAtLength(t+.05),P0=p.getPointAtLength(Math.max(0,t-.05)),an=Math.atan2(P1.y-P0.y,P1.x-P0.x),c=Math.cos(an),s=Math.sin(an);
+   o.push(...tx(q.getPath(-a[i]/2,by,size).commands,(x,y)=>[P.x+x*c-y*s,P.y+x*s+y*c]))})});return o}
+function svgc(it,f){const h=hostSvg(),g=document.createElementNS(svgNS,'g'),s=it.w/it.vw,o=[];g.innerHTML=it.inner;h.appendChild(g);
+ g.querySelectorAll('path,rect,circle,ellipse,polygon,polyline').forEach(e=>{const t=e.tagName,A=n=>+e.getAttribute(n)||0;let d;
+  if(t=='path')d=e.getAttribute('d');else if(t=='rect')d=`M${A('x')} ${A('y')}h${A('width')}v${A('height')}h${-A('width')}z`;
+  else if(t=='circle'||t=='ellipse'){const rx=A('r')||A('rx'),ry=A('r')||A('ry');d=`M${A('cx')-rx} ${A('cy')}A${rx} ${ry} 0 1 0 ${A('cx')+rx} ${A('cy')}A${rx} ${ry} 0 1 0 ${A('cx')-rx} ${A('cy')}Z`}
+  else d='M'+e.getAttribute('points')+(t=='polygon'?'Z':'');
+  if(!d)return;const m=e.getCTM();o.push(...tx(pc(flat(d,it.vw/400)),(x,y)=>f((m.a*x+m.c*y+m.e-it.vx-it.vw/2)*s,(m.b*x+m.d*y+m.f-it.vy-it.vh/2)*s)))});g.remove();return o}
+const cmyk=h=>{const r=parseInt(h.slice(1,3),16)/255,g=parseInt(h.slice(3,5),16)/255,b=parseInt(h.slice(5,7),16)/255,k=1-Math.max(r,g,b);return k>=1?[0,0,0,1]:[(1-r-k)/(1-k),(1-g-k)/(1-k),(1-b-k)/(1-k),k].map(v=>+v.toFixed(4))};
+function voidCmds(){const V=S.void,cx=S.w/2,cy=S.h/2,o=[];
+ V.lines.forEach((l,i)=>{const ax=cx+V.x+(l.dx||0),ay=cy+V.y+(i-1)*V.gap,r=rotAbout(V.angle,cx,cy);
+  o.push(...tx(tcmds(V.font,Array(Math.max(1,l.rep|0)).fill(l.t).join(' '),l.size*PT,V.ls,V.align||'middle'),(x,y)=>r(ax+x,ay+y)))});return o}
+function itemCmds(it,fn){const f=place(it.rot,S.w/2+it.x,S.h/2+it.y);return it.type=='text'?tx(tcmds(fn,it.t,it.size*PT,0,it.align||'middle'),f):(it.type=='rect'||it.type=='circle')?tx(pc(flat(sd(it))),f):svgc(it,f)}
+function whiteCmds(){return S.white.items.flatMap(it=>itemCmds(it,S.white.font))}
+const cd=c=>c.map(q=>q.type=='Z'?'Z':q.type=='M'||q.type=='L'?`${q.type}${n3(q.x)} ${n3(q.y)}`:q.type=='Q'?`Q${n3(q.x1)} ${n3(q.y1)} ${n3(q.x)} ${n3(q.y)}`:`C${n3(q.x1)} ${n3(q.y1)} ${n3(q.x2)} ${n3(q.y2)} ${n3(q.x)} ${n3(q.y)}`).join('');
+const relOL=(di,eo)=>`<path d="${di}${cd(voidCmds())}" fill-rule="evenodd" fill="${S.rel.color}" clip-path="url(#cl)"/>`;
+const whiteOL=(ww,wh)=>`<clipPath id="cw"><rect x="5" y="5" width="${ww}" height="${wh}"/></clipPath><path d="M5 5H${5+ww}V${5+wh}H5Z${cd(whiteCmds())}" fill-rule="evenodd" fill="${S.white.color||'#ffffff'}" fill-opacity="${S.white.op}" clip-path="url(#cw)"/>`;
+function exportPdf(){
+ if(!fkeys().length){msg('Load a font (TTF, OTF or WOFF) first — text is converted to outlines in the PDF.');return}
+ render();msg('');const W=S.w,H=S.h,cx=W/2,cy=H/2,m=S.micro,V=S.void,Wh=S.white,D=S.data,ww=W-10,wh=H-10;
+ const inner=pc(flat(shapeD(m.on?m.safe+m.band:0))),vc=voidCmds(),wc=whiteCmds(),vi=(V.items||[]).flatMap(it=>itemCmds(it,V.font)),ri=(S.rel.items||[]).flatMap(it=>itemCmds(it,V.font));
+ const dc=[],di=[];D.items.forEach(it=>{const f=place(it.rot,cx+it.x,cy+it.y);
+  if(it.type=='num')dc.push(...tx(tcmds(D.font,it.v,it.size*PT,0,it.align||'middle'),f));
+  else if(it.type=='code128'){const hw=it.w/2,hh=it.h/2;c128b(it.v,it.w).forEach(([a,b])=>dc.push(...tx([{type:'M',x:a-hw,y:-hh},{type:'L',x:a+b-hw,y:-hh},{type:'L',x:a+b-hw,y:hh},{type:'L',x:a-hw,y:hh},{type:'Z'}],f)));
+   if(it.txt)dc.push(...tx(tcmds(D.font,it.v,2.2,0,'middle'),(x,y)=>f(x,y+hh+2)))}
+  else di.push(...itemCmds(it,D.font))});
+ const wr=`5 5 ${ww} ${wh} re `,fl=c=>`/CS${c} cs 1 scn `;
+ const LY=[['Micro Security Text',m,m.spot||'Micro Text',m.color,`${fl(1)}${ps(mcmds())}f`],
+  ['Void Message',V,V.spot||'Void',V.color,`${ps(inner)}W n ${fl(2)}${ps(vc)}f ${ps(vi)}f*`],
+  ['Release Layer',S.rel,S.rel.spot||'Release',S.rel.color,`${ps(inner)}W n ${fl(3)}${ps(inner)}${ps(vc)}${ps(vi)}${ps(ri)}f*`],
+  ['White Layer',Wh,Wh.spot||'White',Wh.color||'#ffffff',`${wr}W n ${fl(4)}${wr}${ps(wc)}f*`],
+  ['Data',D,D.spot||'Data Black',D.color,`${fl(5)}${ps(dc)}f ${ps(di)}f*`]];
+ const nm=x=>x.replace(/[^A-Za-z0-9_-]/g,c=>'#'+c.charCodeAt(0).toString(16).padStart(2,'0'));
+ const cs=LY.map((l,i)=>`/CS${i+1} [/Separation /${nm(l[2])} /DeviceCMYK << /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 [${(l[1].cmyk||cmyk(l[3])).join(' ')}] /N 1 >>]`).join(' ');
+ const content=`${K} 0 0 -${K} 0 ${n3(H*K)} cm\n`+LY.map((l,i)=>`/OC /L${i+1} BDC q /GS${i+1} gs ${l[4]} Q EMC`).join('\n'),ids=LY.map((_,i)=>5+i+' 0 R'),ob={};
+ ob[1]=`<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [${ids.join(' ')}] /D << /Order [${ids.join(' ')}] /OFF [${LY.map((l,i)=>l[1].on?'':ids[i]).join(' ')}] >> >> >>`;
+ ob[2]='<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+ ob[3]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${n3(W*K)} ${n3(H*K)}] /Resources << /ColorSpace << ${cs} >> /ExtGState << ${LY.map((l,i)=>`/GS${i+1} << /ca ${i==3?Wh.op:1} /CA ${i==3?Wh.op:1} /OP ${l[1].ovp?'true':'false'} /op ${l[1].ovp?'true':'false'} /OPM 1 >>`).join(' ')} >> /Properties << ${ids.map((r,i)=>`/L${i+1} ${r}`).join(' ')} >> >> /Contents 4 0 R >>`;
+ ob[4]=`<< /Length ${content.length} >>\nstream\n${content}\nendstream`;
+ LY.forEach((l,i)=>ob[5+i]=`<< /Type /OCG /Name (${l[0]}) >>`);
+ let pdf='%PDF-1.7\n',off=[];for(let i=1;i<=9;i++){off[i]=pdf.length;pdf+=`${i} 0 obj\n${ob[i]}\nendobj\n`}
+ const xr=pdf.length;pdf+=`xref\n0 10\n0000000000 65535 f \n`+off.slice(1).map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size 10 /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`;
+ out('security-label.pdf',pdf,'application/pdf');msg('PDF: outlined text, 5 named spot colours, 5 named layers.')}
+
+/* ---------- .ase palette ---------- */
+function parseAse(b){const v=new DataView(b);if(v.getUint32(0)!=0x41534546)throw 0;let o=12,n=v.getUint32(8);const out=[];
+ const hx=r=>'#'+r.map(x=>Math.round(Math.max(0,Math.min(1,x))*255).toString(16).padStart(2,'0')).join('');
+ const gm=u=>u<=.0031308?12.92*u:1.055*Math.pow(u,1/2.4)-.055,fi=t=>t>.206897?t*t*t:(t-16/116)/7.787;
+ while(n--&&o+6<=b.byteLength){const t=v.getUint16(o),len=v.getUint32(o+2);o+=6;const end=o+len;
+  if(t==1){const nl=v.getUint16(o);let name='';for(let i=0;i<nl-1;i++)name+=String.fromCharCode(v.getUint16(o+2+i*2));
+   let q=o+2+nl*2;const mod=String.fromCharCode(v.getUint8(q),v.getUint8(q+1),v.getUint8(q+2),v.getUint8(q+3)).trim();q+=4;
+   const f=Array.from({length:{CMYK:4,RGB:3,LAB:3,Gray:1}[mod]||0},(_,i)=>v.getFloat32(q+4*i));let rgb,cm;
+   if(mod=='CMYK'){rgb=[0,1,2].map(i=>(1-f[i])*(1-f[3]));cm=f.map(x=>+x.toFixed(4))}
+   else if(mod=='RGB')rgb=f;
+   else if(mod=='Gray'){rgb=[f[0],f[0],f[0]];cm=[0,0,0,+(1-f[0]).toFixed(4)]}
+   else if(mod=='LAB'){const L=f[0]*100,fy=(L+16)/116,X=.9642*fi(fy+f[1]/500),Y=fi(fy),Z=.8249*fi(fy-f[2]/200);
+    rgb=[3.1338561*X-1.6168667*Y-.4906146*Z,-.9787684*X+1.9161415*Y+.033454*Z,.0719453*X-.2289914*Y+1.4052427*Z].map(gm)}
+   else{o=end;continue}
+   const hex=hx(rgb);out.push({name:name||hex,model:mod,hex,cmyk:cm||cmyk(hex)})}
+  o=end}
+ return out}
+$('#fase').onchange=async e=>{try{S.palette=parseAse(await e.target.files[0].arrayBuffer());if(!S.palette.length)throw 0;msg(S.palette.length+' swatches loaded. Pick them in each layer; the PDF uses their CMYK values and names as spot colours.')}catch(x){msg('Could not read that .ase file.')}e.target.value='';ui()};
+
+ui();render();
+</script></body></html>
