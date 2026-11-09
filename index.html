@@ -105,7 +105,7 @@ function build(ex){const W=S.w,H=S.h,d0=shapeD(0),m=S.micro,V=S.void,eo=S.shape=
  if(!ex)o+=`<path d="${d0}"${eo} fill="${S.sub||'#b9bcc2'}"/>`;
  o+=L('Micro_Security_Text','Micro Security Text',m.on,microSvg(mm));
  o+=L('Void_Message','Void Message',V.on,`<g clip-path="url(#cl)" fill="${V.color}">${voidT()}${(V.items||[]).map(itm).join('')}</g>`);
- o+=L('Release_Layer','Release Layer',S.rel.on,(`<mask id="mr" maskUnits="userSpaceOnUse" x="-5" y="-5" width="${W+10}" height="${H+10}"><rect x="-5" y="-5" width="${W+10}" height="${H+10}" fill="#fff"/><g fill="#000">${voidT()}${[...(V.items||[]),...(S.rel.items||[])].map(itm).join('')}</g></mask><path d="${di}"${eo} fill="${S.rel.color}" mask="url(#mr)"/>`));
+ o+=L('Release_Layer','Release Layer',S.rel.on,(ww>0&&wh>0?`<mask id="mr" maskUnits="userSpaceOnUse" x="5" y="5" width="${ww}" height="${wh}"><rect x="5" y="5" width="${ww}" height="${wh}" fill="#fff"/><g fill="#000">${voidT()}${[...(V.items||[]),...(S.rel.items||[])].map(itm).join('')}</g></mask><rect x="5" y="5" width="${ww}" height="${wh}" fill="${S.rel.color}" mask="url(#mr)"/>`:''));
  o+=L('White_Layer','White Layer',S.white.on,(ww>0&&wh>0?`<mask id="mw" maskUnits="userSpaceOnUse" x="5" y="5" width="${ww}" height="${wh}"><rect x="5" y="5" width="${ww}" height="${wh}" fill="#fff"/><g fill="#000">${S.white.items.map(itm).join('')}</g></mask><rect x="5" y="5" width="${ww}" height="${wh}" fill="#fff" fill-opacity="${S.white.op}" mask="url(#mw)"/>`:''));
  o+=L('Data','Data',S.data.on,`<g fill="${S.data.color}">${S.data.items.map(dat).join('')}</g>`);
  if(!ex&&S.guides)o+=`<g fill="none" stroke-width=".2" pointer-events="none"><path d="${d0}" stroke="#888"/><path d="${shapeD(m.safe)}" stroke="#e0457b" stroke-dasharray="1 1"/><path d="${shapeD(m.safe+m.band)}" stroke="#e0457b" stroke-dasharray="1 1"/>${ww>0&&wh>0?`<rect x="5" y="5" width="${ww}" height="${wh}" stroke="#2a9d8f" stroke-dasharray="1 1"/>`:''}</g>`;
@@ -348,7 +348,7 @@ function exportPdf(){
  const wr=`5 5 ${ww} ${wh} re `,fl=c=>`/CS${c} cs 1 scn `;
  const LY=[['Micro Security Text',m,m.spot||'Micro Text',m.color,`${fl(1)}${ps(mcmds())}f`],
   ['Void Message',V,V.spot||'Void',V.color,`${ps(inner)}W n ${fl(2)}${ps(vc)}f ${ps(vi)}f*`],
-  ['Release Layer',S.rel,S.rel.spot||'Release',S.rel.color,`${ps(inner)}W n ${fl(3)}${ps(inner)}${ps(vc)}${ps(vi)}${ps(ri)}f*`],
+  ['Release Layer',S.rel,S.rel.spot||'Release',S.rel.color,`${wr}W n ${fl(3)}${wr}${ps(vc)}${ps(vi)}${ps(ri)}f*`],
   ['White Layer',Wh,Wh.spot||'White',Wh.color||'#ffffff',`${wr}W n ${fl(4)}${wr}${ps(wc)}f*`],
   ['Data',D,D.spot||'Data Black',D.color,`${fl(5)}${ps(dc)}f ${ps(di)}f*`]];
  const nm=x=>x.replace(/[^A-Za-z0-9_-]/g,c=>'#'+c.charCodeAt(0).toString(16).padStart(2,'0'));
@@ -384,4 +384,3 @@ $('#fase').onchange=async e=>{try{S.palette=parseAse(await e.target.files[0].arr
 
 ui();render();
 </script></body></html>
-
