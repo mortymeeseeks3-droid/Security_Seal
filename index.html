@@ -30,6 +30,7 @@ small{color:var(--mu);grid-column:1/-1}
 @media(max-width:800px){main{flex-direction:column}#view{position:static;width:100%}#panel{width:100%}}
 </style></head><body>
 <header><h1>Security Label Designer</h1>
+<button data-a="refresh" class="p">Refresh View</button>
 <button data-a="save">Save project</button><button data-a="load">Load project</button>
 <button data-a="export">Layered SVG</button><button class="p" data-a="pdfx">Export vector PDF</button></header>
 <main><div id="view"><div id="stage"></div><small id="msg"></small></div><div id="panel"></div></main>
@@ -129,6 +130,15 @@ function render(){
     w=`${n} full repeat${n>1?'s':''}, spacing justified to ${num(ls)}mm.`+(mx<1?' Text is longer than the perimeter: shorten it or reduce size.':'')+(m.size*PT>m.band?' Text is taller than the band.':'')}}}
  const e=$('#mwarn');if(e)e.textContent=w;if(S.w<=10||S.h<=10)msg('The White Layer is the label minus 10mm in width and height, so it needs a label bigger than 10mm each way.')}
 
+function refreshView(){
+ M={};
+ document.fonts.ready.then(()=>{
+  ui();
+  render();
+  msg('View refreshed successfully.');
+ });
+}
+
 /* ---------- panel ---------- */
 const inp=(p,l,t='number',a='',c='')=>`<label class="${c}">${l}<input data-p="${p}" type="${t}" value="${esc(get(S,p)??'')}" step="any" ${a}></label>`;
 const det=(t,k,b)=>`<details open><summary><input type="checkbox" data-p="${k}.on" ${get(S,k+'.on')?'checked':''}>${t}</summary><div class="b">${b}</div></details>`;
@@ -160,6 +170,7 @@ function ui(){
 $('#panel').addEventListener('input',e=>{const sw=e.target.dataset.sw;if(sw!==undefined){const c=S.palette?.[e.target.value];if(c){Object.assign(S[sw],{color:c.hex,spot:c.name,cmyk:c.cmyk});ui();render()}return}const p=e.target.dataset.p;if(!p)return;const t=e.target;
  let v=t.type=='checkbox'?t.checked:t.type=='number'?(parseFloat(t.value)||0):t.value;set(S,p,v);if(p=='micro.mode'&&!S.micro.sides)S.micro.sides=defaultSides();if(p=='micro.mode'||p.endsWith('.on'))ui();if(p.endsWith('.color'))set(S,p.slice(0,-5)+'cmyk',null);render()});
 document.addEventListener('click',async e=>{const a=e.target.dataset.a;if(!a)return;
+ if(a=='refresh')return refreshView();
  if(a=='pdf')$('#fpdf').click();
  if(a=='addl'){LOGO=e.target.dataset.l;$('#fsvg').click();return}
  if(a=='addr'||a=='addc'){const k=e.target.dataset.l;(S[k].items=S[k].items||[]).push(a=='addr'?{type:'rect',x:0,y:0,w:20,h:10,rad:0,sw:0,rot:0}:{type:'circle',x:0,y:0,w:10,h:10,sw:0,rot:0})}
@@ -258,7 +269,7 @@ $('#ffont').onchange=async e=>{
    msg('Could not read font '+f.name);
   }
  }
- e.target.value='';ui();render();
+ e.target.value='';refreshView();
 };
 
 function preset(){Object.assign(S,{shape:'round',w:90,h:30,r:3,custom:null});
